@@ -115,7 +115,8 @@ python3 -m secauto list-targets
 python3 -m secauto list-tools
 ```
 
-Le scénario de soutenance est détaillé dans [`docs/DEMO.md`](docs/DEMO.md).
+Le scénario de soutenance est détaillé dans [`docs/DEMO.md`](docs/DEMO.md) et
+le plan de présentation dans [`docs/PRESENTATION.md`](docs/PRESENTATION.md).
 
 ---
 
@@ -161,6 +162,25 @@ de comparer objectivement Semgrep, ZAP, Trivy et les détecteurs maison.
 > La vérité terrain doit rester factuelle et versionnée : c'est elle qui rend
 > l'évaluation reproductible. Complète les fichiers au fur et à mesure de tes
 > vérifications manuelles (Burp, Postman).
+
+### Exemple de résultats obtenus (Juice Shop v20.2.0)
+
+| Configuration | Constats | Précision | Rappel |
+|---|---:|---:|---:|
+| Semgrep, règles maison seules (`--offline`) | 3 | 100 % | 23 % |
+| Semgrep, packs OWASP + JavaScript + règles maison | 36 | 17 % | 23 % |
+| npm audit | 97 | 4 % | 31 % |
+| Trivy fs | 52 | 2 % | 8 % |
+| **Campagne `baseline` (SAST + Trivy + npm)** | **55** | **7 %** | **23 %** |
+
+Enseignements : les règles maison sont précises et suffisent à couvrir la
+vérité terrain SAST ; les packs génériques ajoutent surtout du bruit (règles
+AWS / GitHub Actions / npm hors sujet) sans gain de rappel ; le SCA est
+structurellement bruyant à cause des dépendances de développement transitives.
+Ces valeurs proviennent d'exécutions réelles archivées dans
+`reports/juice-shop/` (l'exécution `baseline` correspond à la dernière ligne).
+`npm audit` interroge le registre : hors ligne ou si le registre est lent, il
+peut ne rien retourner — la campagne continue et le signale.
 
 ---
 
@@ -230,3 +250,6 @@ reports/                résultats générés (non versionnés)
   confiance faible et doivent être confirmées manuellement.
 - Roundcube n'est pas fourni avec un serveur mail complet : seules les pages
   publiques sont couvertes par le DAST par défaut.
+- `npm audit` dépend du registre npm : sans réseau il ne renvoie rien (le runner
+  le signale, la campagne continue). Trivy a besoin de télécharger sa base de
+  vulnérabilités au premier lancement.

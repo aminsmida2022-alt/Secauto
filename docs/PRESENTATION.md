@@ -122,6 +122,18 @@ Lecture honnête :
   développement transitives — c'est un résultat sur la cible, pas un bug ;
 - le **rappel global** reste un minorant : la vérité terrain est partielle.
 
+Effet des packs de règles (même cible, mêmes 13 entrées de vérité terrain) :
+
+| Configuration Semgrep | Constats | Précision | Rappel |
+|---|---:|---:|---:|
+| règles maison seules (`--offline`) | 3 | 100 % | 23 % |
+| packs OWASP + JavaScript + règles maison | 36 | 17 % | 23 % |
+
+Le rappel est **identique** : les packs n'ont apporté aucune vulnérabilité
+supplémentaire de la vérité terrain, seulement du bruit (règles AWS, GitHub
+Actions, npm peu pertinentes pour cette cible). C'est exactement le compromis
+que la plateforme permet de mesurer au lieu de le supposer.
+
 *(Les chiffres « par outil » dépendent de la version ; les commandes de
 reproduction sont dans `README.md`.)*
 

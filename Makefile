@@ -14,7 +14,13 @@ help: ## Afficher cette aide
 	  awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 install: ## Installer les dépendances Python du projet
-	$(PY) -m pip install --user -r requirements.txt
+	@if python3 -c "import yaml" 2>/dev/null; then \
+	  echo "PyYAML déjà disponible"; \
+	elif command -v uv >/dev/null 2>&1; then \
+	  uv pip install --system -r requirements.txt; \
+	else \
+	  python3 -m pip install --user -r requirements.txt; \
+	fi
 
 install-docker: ## Installer Docker Engine + Compose (sudo requis)
 	sudo bash scripts/install-docker.sh
