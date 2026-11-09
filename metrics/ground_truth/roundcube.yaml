@@ -1,0 +1,27 @@
+# Vérité terrain — Roundcube Webmail
+#
+# À compléter au fur et à mesure : la liste doit rester factuelle et vérifiable.
+# Les CVE exactes dépendent de la version déployée (voir targets/roundcube).
+
+target: roundcube
+
+vulnerabilities:
+  - id: RC-SECURITY-HEADERS
+    title: En-têtes de sécurité HTTP manquants
+    cwe: [CWE-693]
+    match:
+      endpoint: "localhost:8080/?$"
+
+  - id: RC-CSRF
+    title: Protection CSRF incomplète sur les actions de session
+    cwe: [CWE-352]
+    owasp: [A01:2021]
+    match:
+      endpoint: "/?_task=|/?_action="
+
+  - id: RC-XSS
+    title: XSS dans le rendu des messages
+    cwe: [CWE-79]
+    owasp: [A03:2021]
+    match:
+      endpoint: "/?_task=mail"

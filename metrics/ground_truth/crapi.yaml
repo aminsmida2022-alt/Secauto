@@ -1,0 +1,57 @@
+# Vérité terrain — OWASP crAPI
+#
+# Fondée sur le guide officiel des challenges :
+# https://github.com/OWASP/crAPI/blob/develop/docs/challenges.md
+
+target: crapi
+
+vulnerabilities:
+  - id: CRAPI-BOLA-VEHICLE
+    title: BOLA — accès au véhicule d'un autre utilisateur
+    cwe: [CWE-639]
+    owasp: [API1:2023]
+    match:
+      endpoint: "/identity/api/v2/vehicle"
+      file: "services/identity"
+
+  - id: CRAPI-BFLA-ADMIN
+    title: BFLA — endpoint administratif accessible à un utilisateur standard
+    cwe: [CWE-285, CWE-862]
+    owasp: [API5:2023]
+    match:
+      endpoint: "/workshop/api/shop/orders/all|/admin"
+
+  - id: CRAPI-PROPERTY-RETURN
+    title: Autorisation au niveau des propriétés — retour de commande forcé
+    cwe: [CWE-915]
+    owasp: [API3:2023]
+    match:
+      endpoint: "/shop/api/v1/orders|return_order"
+
+  - id: CRAPI-MASS-ASSIGNMENT
+    title: Assignation de masse sur la mise à jour de profil
+    cwe: [CWE-915]
+    owasp: [API3:2023]
+    match:
+      endpoint: "/identity/api/v2/user"
+
+  - id: CRAPI-RATE-LIMIT
+    title: Absence de limitation de débit sur l'API
+    cwe: [CWE-770]
+    owasp: [API4:2023]
+    match:
+      endpoint: "/identity/api/auth|/workshop/api"
+
+  - id: CRAPI-JWT-WEAK
+    title: Faiblesse de validation du jeton JWT
+    cwe: [CWE-347]
+    owasp: [API2:2023]
+    match:
+      endpoint: "/identity/api/v2/user/dashboard"
+
+  - id: CRAPI-EXCESSIVE-DATA
+    title: Exposition excessive de données dans les réponses
+    cwe: [CWE-213]
+    owasp: [API3:2023]
+    match:
+      endpoint: "/identity/api/v2/user|/workshop/api"

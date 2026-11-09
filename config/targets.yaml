@@ -1,0 +1,74 @@
+# Plateforme cibles
+#
+# Chaque cible décrit :
+#   kind      : web | api
+#   base_url  : URL exposée à DAST
+#   source    : code source local (pour SAST / SCA / Trivy fs)
+#   dast      : options du scanner ZAP
+#   custom    : détecteurs complémentaires (scripts Python, sortie JSON)
+
+targets:
+  crapi:
+    kind: api
+    base_url: http://localhost:8888
+    source: targets/crapi
+    sonar_key: crapi
+    description: >
+      OWASP crAPI — application microservices volontairement vulnérable
+      (BOLA, BFLA, mass assignment, consommation excessive d'API).
+    dast:
+      mode: api            # api | baseline | full
+      openapi: ""          # renseigner une URL de spec si tu en exportes une
+      seed_urls:
+        - http://localhost:8888
+      ajax_spider: false
+    custom:
+      - name: headers
+        script: scanners/custom/check_headers.py
+        args: ["--url", "{base_url}"]
+      - name: idor-api
+        script: scanners/custom/idor_probe.py
+        args: ["--config", "config/idor-crapi.yaml"]
+      - name: jwt
+        script: scanners/custom/check_jwt.py
+        args: ["--config", "config/idor-crapi.yaml"]
+
+  juice-shop:
+    kind: web
+    base_url: http://localhost:3000
+    source: targets/sources/juice-shop
+    sonar_key: juice-shop
+    description: >
+      OWASP Juice Shop — SPA Angular/Node (Express + Sequelize).
+      Sert de cible "avant/après correctif" pour le TP2 (SQLi login).
+    dast:
+      mode: baseline
+      seed_urls:
+        - http://localhost:3000
+      ajax_spider: true
+    sast:
+      # Fixtures pédagogiques (exemples de correctifs) : hors périmètre déployé.
+      exclude:
+        - "data/static/codefixes"
+    custom:
+      - name: headers
+        script: scanners/custom/check_headers.py
+        args: ["--url", "{base_url}"]
+
+  roundcube:
+    kind: web
+    base_url: http://localhost:8080
+    source: targets/sources/roundcube
+    sonar_key: roundcube
+    description: >
+      Roundcube Webmail — cible PHP. Le DAST nécessite un compte de test
+      (voir config/roundcube.env) pour couvrir la zone authentifiée.
+    dast:
+      mode: baseline
+      seed_urls:
+        - http://localhost:8080
+      ajax_spider: false
+    custom:
+      - name: headers
+        script: scanners/custom/check_headers.py
+        args: ["--url", "{base_url}"]

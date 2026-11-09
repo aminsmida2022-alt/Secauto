@@ -1,0 +1,12 @@
+services:
+  roundcube:
+    image: roundcube/roundcubemail:latest-apache
+    container_name: secauto-roundcube
+    ports:
+      - "8080:80"
+    environment:
+      ROUNDCUBEMAIL_DB_TYPE: sqlite
+      ROUNDCUBEMAIL_SKIN: elastic
+      ROUNDCUBEMAIL_DEFAULT_HOST: ssl://mail.example.com
+      ROUNDCUBEMAIL_SMTP_SERVER: tls://mail.example.com
+    restart: unless-stopped

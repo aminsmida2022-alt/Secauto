@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Rapports (archivés en CI, pas versionnés)
+reports/*
+!reports/.gitkeep
+
+# Cibles déployées localement
+targets/crapi/
+targets/sources/
+
+# Secrets / environnement
+.env
+*.local
+
+# OS
+.DS_Store

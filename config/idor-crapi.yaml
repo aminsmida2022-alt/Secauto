@@ -1,0 +1,49 @@
+# Configuration des détecteurs complémentaires (BOLA / BFLA / JWT) pour crAPI.
+# Les comptes sont créés automatiquement ; adapte les emails si besoin.
+
+base_url: http://localhost:8888
+
+users:
+  count: 2
+  email_pattern: "secauto{n}@example.com"
+  password: "SecAuto!2026"
+
+signup:
+  path: /identity/api/auth/signup
+  method: POST
+  body:
+    name: "secauto {n}"
+    email: "{email}"
+    number: "06{n}0000000"
+    password: "{password}"
+
+login:
+  path: /identity/api/auth/login
+  method: POST
+  body:
+    email: "{email}"
+    password: "{password}"
+  token_path: token
+
+# Objets possédés par chaque utilisateur (crAPI : véhicules)
+collect:
+  path: /identity/api/v2/vehicle/vehicles
+  method: GET
+  items_keys: [vehicles, items, data]
+  id_field: id
+
+# Accès à un objet par identifiant (test BOLA)
+access:
+  path: /identity/api/v2/vehicle/{id}
+  method: GET
+
+# Endpoint protégé utilisé par le test de signature JWT
+protected:
+  path: /identity/api/v2/user/dashboard
+  method: GET
+
+# Endpoint réservé aux administrateurs (test BFLA)
+admin:
+  enabled: true
+  path: /workshop/api/shop/orders/all
+  method: GET

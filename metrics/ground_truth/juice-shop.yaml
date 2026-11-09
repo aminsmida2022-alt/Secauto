@@ -1,0 +1,103 @@
+# Vérité terrain — OWASP Juice Shop
+#
+# Liste des vulnérabilités réellement présentes dans la cible, utilisée pour
+# calculer TP / FP / FN. Adapte-la à la version de l'image utilisée.
+#
+# match.endpoint : regex appliquée à l'endpoint d'un constat DAST/CUSTOM
+# match.file     : regex appliquée au fichier d'un constat SAST/SCA
+# Les deux sont des alternatives (l'un OU l'autre suffit).
+
+target: juice-shop
+
+vulnerabilities:
+  - id: JS-SQLI-LOGIN
+    title: Injection SQL sur l'authentification
+    cwe: [CWE-89]
+    owasp: [A03:2021]
+    match:
+      endpoint: "/rest/user/login"
+      file: "routes/login"
+
+  - id: JS-SQLI-SEARCH
+    title: Injection SQL dans la recherche produit
+    cwe: [CWE-89]
+    owasp: [A03:2021]
+    match:
+      endpoint: "/rest/products/search"
+      file: "routes/search"
+
+  - id: JS-XSS-SEARCH
+    title: XSS réfléchi dans la recherche produit
+    cwe: [CWE-79]
+    owasp: [A03:2021]
+    match:
+      endpoint: "/rest/products/search"
+
+  - id: JS-XSS-REVIEW
+    title: XSS stocké dans les avis produit
+    cwe: [CWE-79]
+    owasp: [A03:2021]
+    match:
+      endpoint: "/api/Products/.*/reviews"
+
+  - id: JS-BOLA-BASKET
+    title: Contrôle d'accès horizontal sur les paniers
+    cwe: [CWE-639]
+    owasp: [API1:2023]
+    match:
+      endpoint: "/rest/basket|/api/Baskets"
+
+  - id: JS-JWT-HARDCODED
+    title: Secret JWT codé en dur
+    cwe: [CWE-798]
+    match:
+      file: "lib/insecurity|security"
+
+  - id: JS-SECURITY-HEADERS
+    title: En-têtes de sécurité HTTP manquants
+    cwe: [CWE-693]
+    match:
+      endpoint: "localhost:3000/?$"
+
+  - id: JS-NOSQL-INJECTION
+    title: Injection NoSQL sur les produits
+    cwe: [CWE-943]
+    owasp: [A03:2021]
+    match:
+      endpoint: "/rest/products/search"
+
+  - id: JS-BROKEN-AUTH
+    title: Faiblesses d'authentification (énumération, absence de verrouillage)
+    cwe: [CWE-307, CWE-204]
+    match:
+      endpoint: "/rest/user/login"
+
+# --- SCA ---------------------------------------------------------------------
+# Références issues de `npm audit` sur Juice Shop v20.2.0. On utilise l'ID
+# d'avis npm (colonne `source`) car toutes les entrées n'ont pas de CVE.
+# Une grande partie de ces avis concerne des dépendances de développement
+# transitives : le faible taux de précision qui en résulte est un résultat
+# d'analyse, pas un défaut de la plateforme.
+  - id: JS-SCA-LODASH-PROTO
+    title: Prototype pollution dans lodash
+    cwe: [CWE-1321]
+    match:
+      rule: "1106918"
+
+  - id: JS-SCA-JWT-BYPASS
+    title: Contournement de vérification dans jsonwebtoken
+    cwe: [CWE-347]
+    match:
+      rule: "1090918"
+
+  - id: JS-SCA-MARSDB-CMDI
+    title: Injection de commande dans marsdb
+    cwe: [CWE-78]
+    match:
+      rule: "1086801"
+
+  - id: JS-SCA-CRYPTOJS-PBKDF2
+    title: PBKDF2 affaibli dans crypto-js
+    cwe: [CWE-916]
+    match:
+      rule: "1096365"

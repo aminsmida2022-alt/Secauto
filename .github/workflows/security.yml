@@ -1,0 +1,141 @@
+name: security-scan
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  schedule:
+    - cron: "0 3 * * 1"   # tous les lundis à 03:00 UTC (DAST complet)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  # -------------------------------------------------------------------------
+  # SAST + SCA : rapide, exécuté à chaque modification de code
+  # -------------------------------------------------------------------------
+  sast-sca:
+    name: SAST + SCA
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [juice-shop, crapi]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances Python
+        run: pip install -r requirements.txt
+
+      - name: Installer Semgrep
+        run: pip install semgrep
+
+      - name: Installer Trivy
+        uses: aquasecurity/setup-trivy@v0.2.2
+        with:
+          version: v0.57.1
+
+      - name: Récupérer le code source des cibles
+        run: |
+          if [ "${{ matrix.target }}" = "juice-shop" ]; then
+            bash scripts/fetch-sources.sh
+          else
+            bash scripts/deploy-crapi.sh || true
+          fi
+
+      - name: Exécuter SAST + SCA
+        run: |
+          python -m secauto run \
+            --target "${{ matrix.target }}" \
+            --tools sast,sca,sca-npm \
+            --run-id "ci-${{ github.run_number }}"
+
+      - name: Publier les résultats SARIF (GitHub code scanning)
+        if: always()
+        run: python scripts/to_sarif.py --run-dir "reports/${{ matrix.target }}/ci-${{ github.run_number }}" --out secauto.sarif
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: secauto.sarif
+          category: "secauto-${{ matrix.target }}"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports-sast-sca-${{ matrix.target }}
+          path: reports/${{ matrix.target }}/
+          retention-days: 30
+
+  # -------------------------------------------------------------------------
+  # DAST : la cible est déployée, puis scannée par ZAP
+  # -------------------------------------------------------------------------
+  dast:
+    name: DAST (ZAP)
+    runs-on: ubuntu-latest
+    needs: sast-sca
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Démarrer Juice Shop
+        run: docker compose -f targets/compose/juice-shop.yml up -d
+
+      - name: Attendre la disponibilité
+        run: |
+          for i in $(seq 1 45); do
+            curl -fsS -o /dev/null http://localhost:3000/ && exit 0
+            sleep 2
+          done
+          echo "Juice Shop indisponible" >&2
+          docker compose -f targets/compose/juice-shop.yml logs
+          exit 1
+
+      - name: Exécuter DAST
+        run: |
+          python -m secauto run \
+            --target juice-shop \
+            --tools dast,custom \
+            --run-id "ci-${{ github.run_number }}"
+
+      - name: Archiver les rapports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-dast
+          path: reports/juice-shop/
+          retention-days: 30
+
+  # -------------------------------------------------------------------------
+  # Agrégation : un artefact unique + tableau de bord
+  # -------------------------------------------------------------------------
+  summary:
+    name: Agrégation
+    runs-on: ubuntu-latest
+    needs: [sast-sca, dast]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Résumé
+        run: |
+          echo "## Résultats secauto" >> "$GITHUB_STEP_SUMMARY"
+          find artifacts -name summary.md -print -exec cat {} \;
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reports-all
+          path: artifacts
+          retention-days: 30
