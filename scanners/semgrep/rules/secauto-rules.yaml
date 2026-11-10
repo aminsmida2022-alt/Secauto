@@ -84,9 +84,10 @@ rules:
     languages: [java]
     severity: WARNING
     message: >-
-      Endpoint Spring exposant un identifiant (@PathVariable) vers un dépôt
-      sans annotation d'autorisation (@PreAuthorize / @Secured) : risque de
-      BOLA (OWASP API1:2023). Contrôler la propriété de l'objet.
+      Méthode Spring recevant un identifiant (@PathVariable) et l'utilisant
+      directement dans un accès au dépôt, sans annotation d'autorisation
+      (@PreAuthorize / @Secured) : risque de BOLA (OWASP API1:2023).
+      Contrôler la propriété de l'objet avant l'accès.
     metadata:
       category: security
       cwe: "CWE-862: Missing Authorization"
@@ -97,8 +98,12 @@ rules:
     patterns:
       - pattern-inside: |
           @$MAPPING(...)
-          $RET $METHOD(...) { ... }
-      - pattern: $REPO.$CALL(..., $ID, ...);
+          $RET $METHOD(..., @PathVariable(...) $ID, ...) { ... }
+      - pattern-either:
+          - pattern: $REPO.findById($ID)
+          - pattern: $REPO.getById($ID)
+          - pattern: $REPO.deleteById($ID)
+          - pattern: $REPO.findBy$FIELD($ID)
       - pattern-not-inside: |
           @PreAuthorize(...)
           $RET $METHOD(...) { ... }

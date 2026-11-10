@@ -15,11 +15,12 @@ vulnerabilities:
       file: "services/identity"
 
   - id: CRAPI-BFLA-ADMIN
-    title: BFLA — endpoint administratif accessible à un utilisateur standard
+    title: BFLA — fonction d'administration accessible à un utilisateur standard
     cwe: [CWE-285, CWE-862]
     owasp: [API5:2023]
     match:
-      endpoint: "/workshop/api/shop/orders/all|/admin"
+      endpoint: "/identity/api/v2/admin/videos|/workshop/api/shop/orders/all|/admin"
+      file: "services/identity"
 
   - id: CRAPI-PROPERTY-RETURN
     title: Autorisation au niveau des propriétés — retour de commande forcé

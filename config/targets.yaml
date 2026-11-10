@@ -17,7 +17,7 @@ targets:
       OWASP crAPI — application microservices volontairement vulnérable
       (BOLA, BFLA, mass assignment, consommation excessive d'API).
     dast:
-      mode: api            # api | baseline | full
+      mode: baseline       # api | baseline | full
       openapi: ""          # renseigner une URL de spec si tu en exportes une
       seed_urls:
         - http://localhost:8888

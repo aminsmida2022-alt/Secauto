@@ -53,7 +53,7 @@ CI/CD  : GitHub Actions (push/PR → SAST+SCA, nightly → DAST, artefacts + SAR
 | Déploiement de l'environnement de test | `targets/compose/*.yml`, `scripts/deploy-crapi.sh` |
 | SAST | `secauto/runners.py` → Semgrep (+ SonarQube via API) |
 | DAST | ZAP baseline / full / api-scan |
-| SCA | Trivy (vulnérabilités, secrets, misconfig) + `npm audit` |
+| SCA | Trivy (vulnérabilités, secrets) + `npm audit` |
 | Conservation des résultats de chaque outil | `reports/<cible>/<run>/raw/` |
 | Mécanisme complémentaire | 5 règles Semgrep maison + 3 détecteurs Python (headers, BOLA/BFLA, JWT) |
 | Automatisation | `Makefile`, CLI `secauto`, workflow GitHub Actions |
@@ -183,6 +183,32 @@ Ces valeurs proviennent d'exécutions réelles archivées dans
 `npm audit` interroge le registre : hors ligne ou si le registre est lent, il
 peut ne rien retourner — la campagne continue et le signale.
 
+### Exemple de résultats obtenus (crAPI, détecteurs maison)
+
+Commande : `python3 -m secauto run --target crapi --tools custom --run-id custom-crapi`.
+
+| Détecteur | Constats | TP | FP | Précision | Rappel |
+|---|---:|---:|---:|---:|---:|
+| `custom:idor-api` (BOLA + BFLA) | 2 | 2 | 0 | 100 % | 29 % |
+| `custom:jwt` | 1 | 1 | 0 | 100 % | 14 % |
+| `custom:headers` | 6 | 0 | 6 | 0 % | 0 % |
+| **Total** | **9** | **3** | **6** | **33 %** | **43 %** |
+
+Les trois vulnérabilités de la vérité terrain couvertes sont vérifiées
+manuellement avant d'être automatisées :
+
+- **BOLA** — `GET /identity/api/v2/vehicle/{id}/location` renvoie le nom,
+  l'email et les coordonnées GPS du véhicule d'un autre utilisateur ;
+- **BFLA** — `DELETE /identity/api/v2/admin/videos/{id}` répond `200` pour un
+  compte standard alors que la route `/user/videos/{id}` refuse l'opération ;
+- **JWT** — un jeton dont la signature a été altérée est accepté sur
+  `/identity/api/v2/user/dashboard`.
+
+Les six constats d'en-têtes sont réels mais **hors vérité terrain** (celle-ci
+suit la liste officielle des challenges crAPI) : ils sont donc comptés comme
+faux positifs. C'est le comportement attendu d'une métrique dont la référence
+est explicite — et non un défaut du détecteur.
+
 ---
 
 ## 6. Mécanisme de détection complémentaire
@@ -202,7 +228,7 @@ peut ne rien retourner — la campagne continue et le signale.
 | Script | Ce qu'il détecte | Méthode |
 |---|---|---|
 | `check_headers.py` | en-têtes manquants, cookies non durcis, CORS permissif | requête HTTP + analyse |
-| `idor_probe.py` | **BOLA** et **BFLA** | crée 2 comptes, échange les identifiants d'objets |
+| `idor_probe.py` | **BOLA** et **BFLA** | crée 2 comptes, collecte les objets exposés côté forum, rejoue l'accès avec le jeton d'un autre compte, puis appelle une fonction `/admin` avec un compte standard |
 | `check_jwt.py` | signature non vérifiée, absence d'`exp`, données sensibles | altère la signature et rejoue la requête |
 
 Ces scripts respectent le contrat `{"findings": [...]}` et sont donc

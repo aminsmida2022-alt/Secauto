@@ -165,11 +165,14 @@ class TrivyRunner(Runner):
             return []
 
         raw = self._raw_dir(run_dir) / "trivy.json"
+        # SCA = dépendances vulnérables + secrets. Les mauvaises configurations
+        # IaC (charts, manifestes k8s) sont hors périmètre du cours et sont
+        # couvertes par le détecteur d'en-têtes côté application.
         cmd = [
             "trivy", "fs", "--quiet",
             "--format", "json",
             "--output", str(raw),
-            "--scanners", "vuln,secret,misconfig",
+            "--scanners", "vuln,secret",
             str(source),
         ]
         if self.options.get("offline"):
@@ -375,6 +378,11 @@ class ZapRunner(Runner):
     def missing_hint(self) -> str:
         return "installer Docker (scripts/install-docker.sh)"
 
+    def docker_cli(self) -> list[str]:
+        """Utilise scripts/dk si présent (gère l'accès au groupe docker)."""
+        wrapper = ROOT / "scripts" / "dk"
+        return [str(wrapper)] if wrapper.exists() else ["docker"]
+
     def run(self, target_name: str, target: dict, run_dir: Path) -> list[Finding]:
         base_url = target.get("base_url", "")
         if not base_url:
@@ -389,7 +397,7 @@ class ZapRunner(Runner):
         }.get(mode, "zap-baseline.py")
 
         cmd = [
-            "docker", "run", "--rm", "--network", "host",
+            *self.docker_cli(), "run", "--rm", "--network", "host",
             "-v", f"{raw_dir}:/zap/wrk:rw",
             "-t", self.IMAGE,
             script,

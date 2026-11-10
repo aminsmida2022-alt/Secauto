@@ -76,7 +76,7 @@ python3 -m secauto run --target crapi
 ```
 
 - SAST : Semgrep (packs OWASP/JS + 5 règles maison) ;
-- SCA : Trivy (`vuln,secret,misconfig`) + `npm audit` ;
+- SCA : Trivy (`vuln,secret`) + `npm audit` ;
 - DAST : ZAP baseline / full / api-scan ;
 - CUSTOM : `check_headers.py`, `idor_probe.py`, `check_jwt.py`.
 
@@ -133,6 +133,18 @@ Le rappel est **identique** : les packs n'ont apporté aucune vulnérabilité
 supplémentaire de la vérité terrain, seulement du bruit (règles AWS, GitHub
 Actions, npm peu pertinentes pour cette cible). C'est exactement le compromis
 que la plateforme permet de mesurer au lieu de le supposer.
+
+### crAPI (détecteurs maison, `--tools custom`)
+
+| Détecteur | Constats | TP | FP | Précision | Rappel |
+|---|---:|---:|---:|---:|---:|
+| BOLA + BFLA (`idor_probe.py`) | 2 | 2 | 0 | 100 % | 29 % |
+| JWT (`check_jwt.py`) | 1 | 1 | 0 | 100 % | 14 % |
+| En-têtes (`check_headers.py`) | 6 | 0 | 6 | 0 % | 0 % |
+| **Total** | **9** | **3** | **6** | **33 %** | **43 %** |
+
+Les six constats d'en-têtes sont volontairement comptés FP : la vérité terrain
+suit les challenges OWASP, pas les bonnes pratiques de configuration.
 
 *(Les chiffres « par outil » dépendent de la version ; les commandes de
 reproduction sont dans `README.md`.)*

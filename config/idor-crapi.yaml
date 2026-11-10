@@ -1,5 +1,12 @@
 # Configuration des détecteurs complémentaires (BOLA / BFLA / JWT) pour crAPI.
-# Les comptes sont créés automatiquement ; adapte les emails si besoin.
+# Les comptes de test sont créés automatiquement ; adapte les emails si besoin.
+#
+# Endpoints vérifiés manuellement sur crAPI (develop) :
+#   - BOLA  : GET /identity/api/v2/vehicle/{vehicleid}/location
+#             (fuite de carId, fullName, email, coordonnées GPS d'un autre utilisateur)
+#   - BFLA  : DELETE /identity/api/v2/admin/videos/{video_id}
+#             (fonction d'administration acceptée pour un compte standard)
+#   - JWT   : signature non vérifiée sur /identity/api/v2/user/dashboard
 
 base_url: http://localhost:8888
 
@@ -14,7 +21,7 @@ signup:
   body:
     name: "secauto {n}"
     email: "{email}"
-    number: "06{n}0000000"
+    number: "{phone}"
     password: "{password}"
 
 login:
@@ -25,25 +32,58 @@ login:
     password: "{password}"
   token_path: token
 
-# Objets possédés par chaque utilisateur (crAPI : véhicules)
+# Collecte des identifiants d'objets.
+# mode "others" : les identifiants proviennent d'objets appartenant à d'autres
+# utilisateurs (ici les vehicleid exposés par les posts du forum). Un compte
+# crAPI fraîchement créé ne possède aucun véhicule, donc le mode "own" ne
+# permettrait pas de tester le BOLA.
 collect:
-  path: /identity/api/v2/vehicle/vehicles
+  mode: others
+  path: /community/api/v2/community/posts/recent
   method: GET
-  items_keys: [vehicles, items, data]
-  id_field: id
+  items_path: posts
+  id_path: author.vehicleid
+  # Objets possédés par le compte de test, à exclure des cibles (facultatif).
+  own:
+    path: /identity/api/v2/vehicle/vehicles
+    method: GET
+    items_keys: [vehicles, items, data]
+    id_field: id
 
-# Accès à un objet par identifiant (test BOLA)
+# Accès à un objet par identifiant (test BOLA).
 access:
-  path: /identity/api/v2/vehicle/{id}
+  path: /identity/api/v2/vehicle/{id}/location
   method: GET
+  # Vérifie d'abord que l'endpoint refuse un accès anonyme : sans ce contrôle,
+  # un endpoint public produirait un faux positif BOLA.
+  require_auth: true
+  # Champs sensibles attendus dans la réponse pour qualifier la fuite.
+  leak_keys: [carId, fullName, email, vehicleLocation]
 
-# Endpoint protégé utilisé par le test de signature JWT
+# Endpoint protégé utilisé par le test de signature JWT.
 protected:
   path: /identity/api/v2/user/dashboard
   method: GET
 
-# Endpoint réservé aux administrateurs (test BFLA)
+# BFLA : une fonction d'administration utilisable par un compte standard.
 admin:
   enabled: true
-  path: /workshop/api/shop/orders/all
-  method: GET
+  # 1) On crée un objet contrôlé (vidéo) avec le compte standard.
+  setup:
+    path: /identity/api/v2/user/videos
+    method: POST
+    multipart:
+      field: file
+      filename: secauto.mp4
+      content_type: video/mp4
+      content: "secauto probe video"
+    id_path: id
+  # 2) On appelle la fonction d'administration sur cet objet.
+  path: /identity/api/v2/admin/videos/{id}
+  method: DELETE
+  success_markers: ["deleted successfully"]
+  # 3) Contrôle : la route standard doit, elle, refuser l'opération.
+  control:
+    path: /identity/api/v2/user/videos/{id}
+    method: DELETE
+    denied_markers: ["admin function", "forbidden", "not allowed"]

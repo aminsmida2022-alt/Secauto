@@ -65,12 +65,20 @@ python3 -m secauto run --target crapi
 Détailler ce qui se passe à l'écran :
 
 1. **SAST** — Semgrep applique les packs OWASP + 5 règles maison.
-2. **SCA** — Trivy (CVE, secrets, misconfigurations) + `npm audit`.
+2. **SCA** — Trivy (CVE, secrets) + `npm audit`.
 3. **DAST** — ZAP baseline contre l'application démarrée.
 4. **CUSTOM** — trois scripts Python :
-   - `idor_probe.py` crée deux comptes et tente d'accéder au véhicule de l'autre ;
+   - `idor_probe.py` crée deux comptes, récupère les identifiants de véhicules exposés par le forum et tente d'y accéder avec le jeton d'un autre compte (BOLA), puis appelle une fonction d'administration (BFLA) ;
    - `check_jwt.py` altère la signature d'un jeton et vérifie si le serveur l'accepte ;
    - `check_headers.py` contrôle en-têtes, cookies et CORS.
+
+Résultats attendus côté détecteurs maison :
+
+- 1 **critical** — signature JWT non vérifiée (`/identity/api/v2/user/dashboard`) ;
+- 1 **high** — BOLA sur `/identity/api/v2/vehicle/{id}/location` (nom, email et
+  coordonnées GPS d'un autre utilisateur) ;
+- 1 **high** — BFLA sur `DELETE /identity/api/v2/admin/videos/{id}` avec un
+  compte standard.
 
 Montrer l'arborescence produite :
 
