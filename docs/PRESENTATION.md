@@ -157,7 +157,7 @@ suit les challenges OWASP, pas les bonnes pratiques de configuration.
 Le **DAST seul** ne retrouve aucune vulnérabilité crAPI (ZAP : 28 constats,
 0 TP) : BOLA/BFLA sont des failles de logique métier. La campagne complète
 (SAST + SCA + DAST + custom) plafonne à 1 % de précision pour 43 % de rappel —
-le bruit vient du SCA (271 CVE) et de ZAP, hors périmètre de la GT.
+le bruit vient du SCA (271 CVE), de Semgrep (143 constats hors périmètre) et de ZAP (26), hors périmètre de la GT.
 
 ### DAST sur les trois cibles
 

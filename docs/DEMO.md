@@ -136,9 +136,11 @@ Expliquer la vérité terrain :
 
 Sur crAPI, la campagne complète donne **43 % de rappel** mais **1 % de
 précision** : les 449 constats sont dominés par le SCA (271 CVE de dépendances)
-et ZAP, alors que la vérité terrain ne contient que les challenges. Le tableau
-par outil montre l'essentiel : les détecteurs maison placent les 3 TP métier
-(BOLA, BFLA, JWT), ZAP 0/26, Trivy 0/271.
+et Semgrep (143 constats hors périmètre), alors que la vérité terrain ne
+contient que les challenges. Le tableau par outil montre l'essentiel : les
+détecteurs maison couvrent les 3 vulnérabilités (BOLA, BFLA, JWT) et Semgrep
+retrouve également la BFLA (règle Java, 3 TP via services/identity) — 6 TP au
+total ; ZAP 0/26, Trivy 0/271.
 
 ---
 
