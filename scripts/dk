@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#
+# Petit adaptateur Docker.
+#
+# Le groupe `docker` n'est pris en compte qu'à l'ouverture d'une nouvelle
+# session : après l'installation, `docker` reste donc inaccessible dans le
+# terminal courant. Ce script réexécute la commande via `sg docker` dans ce cas,
+# pour que `make up-juice` / `make up-crapi` fonctionnent sans reconnexion.
+#
+# Usage interne : ./scripts/dk compose -f targets/compose/juice-shop.yml up -d
+#
+set -euo pipefail
+
+if docker info >/dev/null 2>&1; then
+  exec docker "$@"
+fi
+
+if ! getent group docker | cut -d: -f4 | tr ',' '\n' | grep -qx "$USER"; then
+  echo "Docker est inaccessible et « $USER » n'est pas dans le groupe docker." >&2
+  echo "Lance : sudo bash scripts/install-docker.sh" >&2
+  exit 1
+fi
+
+printf -v cmd '%q ' docker "$@"
+exec sg docker -c "$cmd"

@@ -21,8 +21,10 @@ if command -v docker >/dev/null 2>&1; then
   ok "docker : $(docker --version)"
   if docker info >/dev/null 2>&1; then
     ok "démon Docker accessible"
+  elif ./scripts/dk info >/dev/null 2>&1; then
+    warn "démon accessible via « sg docker » — ouvre une nouvelle session pour l'utiliser directement"
   else
-    ko "démon Docker inaccessible (nouvelle session ou : newgrp docker)"
+    ko "démon Docker inaccessible (service démarré ? sudo systemctl start docker)"
   fi
   if docker compose version >/dev/null 2>&1; then
     ok "docker compose : $(docker compose version --short)"

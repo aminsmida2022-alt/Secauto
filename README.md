@@ -78,6 +78,7 @@ CI/CD  : GitHub Actions (push/PR → SAST+SCA, nightly → DAST, artefacts + SAR
 # 0. Docker (une seule fois)
 sudo bash scripts/install-docker.sh
 # puis rouvrir la session, ou : newgrp docker
+# (les commandes `make` passent par scripts/dk : pas besoin de reconnexion)
 
 # 1. Dépendances Python
 make install

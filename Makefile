@@ -1,5 +1,6 @@
 SHELL      := /bin/bash
 PY         := python3
+DK         := ./scripts/dk
 TARGET     ?= juice-shop
 TOOLS      ?= sast,sca,sca-npm,dast,custom
 RUN_ID     ?=
@@ -32,14 +33,14 @@ up-crapi: ## Déployer crAPI (http://localhost:8888)
 	bash scripts/deploy-crapi.sh
 
 up-juice: ## Déployer Juice Shop (http://localhost:3000)
-	docker compose -f targets/compose/juice-shop.yml up -d
+	$(DK) compose -f targets/compose/juice-shop.yml up -d
 
 up-roundcube: ## Déployer Roundcube (http://localhost:8080)
-	docker compose -f targets/compose/roundcube.yml up -d
+	$(DK) compose -f targets/compose/roundcube.yml up -d
 
 up-sonar: ## Déployer SonarQube (http://localhost:9000, admin/admin)
 	sudo sysctl -w vm.max_map_count=262144
-	docker compose -f targets/compose/sonarqube.yml up -d
+	$(DK) compose -f targets/compose/sonarqube.yml up -d
 
 sonar: ## Lancer sonar-scanner sur TARGET (SONAR_HOST_URL / SONAR_TOKEN requis)
 	bash scripts/run-sonar.sh $(TARGET)
@@ -50,11 +51,11 @@ down-crapi: ## Arrêter crAPI
 	bash scripts/deploy-crapi.sh stop
 
 down: ## Arrêter Juice Shop et Roundcube
-	docker compose -f targets/compose/juice-shop.yml down
-	docker compose -f targets/compose/roundcube.yml down
+	$(DK) compose -f targets/compose/juice-shop.yml down
+	$(DK) compose -f targets/compose/roundcube.yml down
 
 down-sonar: ## Arrêter SonarQube
-	docker compose -f targets/compose/sonarqube.yml down
+	$(DK) compose -f targets/compose/sonarqube.yml down
 
 down-all: down down-crapi ## Arrêter toutes les cibles
 
