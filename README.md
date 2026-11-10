@@ -170,18 +170,19 @@ de comparer objectivement Semgrep, ZAP, Trivy et les détecteurs maison.
 |---|---:|---:|---:|
 | Semgrep, règles maison seules (`--offline`) | 3 | 100 % | 23 % |
 | Semgrep, packs OWASP + JavaScript + règles maison | 36 | 17 % | 23 % |
-| npm audit | 97 | 4 % | 31 % |
-| Trivy fs | 52 | 2 % | 8 % |
-| **Campagne `baseline` (SAST + Trivy + npm)** | **55** | **7 %** | **23 %** |
+| Trivy fs (vulnérabilités + secrets) | 5 | 20 % | 8 % |
+| **Campagne `baseline` (SAST + Trivy)** | **41** | **17 %** | **23 %** |
 
 Enseignements : les règles maison sont précises et suffisent à couvrir la
 vérité terrain SAST ; les packs génériques ajoutent surtout du bruit (règles
-AWS / GitHub Actions / npm hors sujet) sans gain de rappel ; le SCA est
-structurellement bruyant à cause des dépendances de développement transitives.
-Ces valeurs proviennent d'exécutions réelles archivées dans
-`reports/juice-shop/` (l'exécution `baseline` correspond à la dernière ligne).
-`npm audit` interroge le registre : hors ligne ou si le registre est lent, il
-peut ne rien retourner — la campagne continue et le signale.
+AWS / GitHub Actions / npm hors sujet) sans gain de rappel ; le SCA remonte ici
+surtout des secrets (clés privées, jetons JWT), avec un vrai positif sur cinq.
+`npm audit` dépend du registre et d'un lockfile : lors des premières campagnes
+il a remonté 97 constats (4 % de précision, 31 % de rappel), mais lors de la
+dernière exécution il a expiré — la campagne a continué et l'erreur est
+consignée dans le rapport. Ces valeurs proviennent d'exécutions réelles
+archivées dans `reports/juice-shop/` (l'exécution `baseline` correspond à la
+dernière ligne).
 
 ### Exemple de résultats obtenus (crAPI, détecteurs maison)
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,10 @@ def run(
     run_id = run_id or new_run_id()
 
     run_dir = REPORT_DIR / target_name / run_id
+    # Une même exécution doit être reproductible : on repart d'un répertoire
+    # vide pour éviter qu'une sortie brute d'un run précédent ne subsiste.
+    if run_dir.exists():
+        shutil.rmtree(run_dir)
     (run_dir / "raw").mkdir(parents=True, exist_ok=True)
 
     print(f"\n=== secauto — cible: {target_name} — run: {run_id} ===")

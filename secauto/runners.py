@@ -257,7 +257,7 @@ class NpmAuditRunner(Runner):
             return []
 
         raw = self._raw_dir(run_dir) / "npm-audit.json"
-        result = self._exec(["npm", "audit", "--json"], cwd=source, timeout=900)
+        result = self._exec(["npm", "audit", "--json"], cwd=source, timeout=300)
         text = result.stdout.strip() or "{}"
         try:
             payload = json.loads(text)

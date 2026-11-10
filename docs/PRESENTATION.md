@@ -108,18 +108,21 @@ outils industriels.
 
 Exécution `baseline` : SAST + Trivy + npm audit.
 
-| Outil | Constats | TP | FP | Précision | Rappel |
+| Configuration | Constats | TP | FP | Précision | Rappel |
 |---|---:|---:|---:|---:|---:|
-| Semgrep (règles maison, hors ligne) | 3 | 3 | 0 | 100 % | 23 % |
-| Trivy fs | 52 | 1 | 51 | 2 % | 8 % |
-| npm audit | 97 | 4 | 93 | 4 % | 31 % |
-| **Global** | **55** | **4** | **51** | **7 %** | **23 %** |
+| Semgrep, règles maison seules (`--offline`) | 3 | 3 | 0 | 100 % | 23 % |
+| Semgrep, packs + règles maison | 36 | 6 | 30 | 17 % | 23 % |
+| Trivy fs (vulnérabilités + secrets) | 5 | 1 | 4 | 20 % | 8 % |
+| **Campagne `baseline` (packs + Trivy)** | **41** | **7** | **34** | **17 %** | **23 %** |
+
+`npm audit` n'est pas compté ici : lors de la dernière exécution, le registre
+n'a pas répondu et l'outil a expiré (l'erreur est consignée, la campagne a
+continué). Il reste activable et tourne en CI lorsque le lockfile est présent.
 
 Lecture honnête :
 
 - Semgrep est **précis** mais ne couvre que ce que ses règles décrivent ;
-- Trivy et npm audit sont **bruyants** car ils remontent des dépendances de
-  développement transitives — c'est un résultat sur la cible, pas un bug ;
+- Trivy remonte ici surtout des **secrets** (clés privées, jetons JWT) ;
 - le **rappel global** reste un minorant : la vérité terrain est partielle.
 
 Effet des packs de règles (même cible, mêmes 13 entrées de vérité terrain) :
