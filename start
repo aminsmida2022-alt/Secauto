@@ -128,16 +128,17 @@ run_scan(){
   if [[ $exit_code -eq 0 ]]; then
     ok "Terminé : $label"
     local report
-    report="$(dirname "$0")/reports/$target/$rid/report.html"
+    report="$(realpath "$(dirname "$0")/reports/$target/$rid/report.html")"
     if [[ -f "$report" ]]; then
       local metrics
       metrics="$(python3 -c "
 import json,sys
-m=json.load(open('$(dirname "$0")/reports/$target/$rid/metrics.json'))
+m=json.load(open('$(dirname "$(realpath "$0")")/reports/$target/$rid/metrics.json'))
 o=m.get('overall',{})
 print(f\"  constats: {o.get('tp',0)+o.get('fp',0)}  TP: {o.get('tp',0)}  P: {o.get('precision',0):.0%}  R: {o.get('recall',0):.0%}\")
 " 2>/dev/null || echo "")"
       inf "Métriques :$metrics"
+      inf "Rapport   : ${W}$report${N}"
       REPORTS+=("$report")
     fi
   else
