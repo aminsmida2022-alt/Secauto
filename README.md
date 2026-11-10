@@ -171,12 +171,15 @@ de comparer objectivement Semgrep, ZAP, Trivy et les détecteurs maison.
 | Semgrep, règles maison seules (`--offline`) | 3 | 100 % | 23 % |
 | Semgrep, packs OWASP + JavaScript + règles maison | 36 | 17 % | 23 % |
 | Trivy fs (vulnérabilités + secrets) | 5 | 20 % | 8 % |
+| ZAP baseline (DAST) | 51 | 6 % | 8 % |
 | **Campagne `baseline` (SAST + Trivy)** | **41** | **17 %** | **23 %** |
 
 Enseignements : les règles maison sont précises et suffisent à couvrir la
 vérité terrain SAST ; les packs génériques ajoutent surtout du bruit (règles
 AWS / GitHub Actions / npm hors sujet) sans gain de rappel ; le SCA remonte ici
-surtout des secrets (clés privées, jetons JWT), avec un vrai positif sur cinq.
+surtout des secrets (clés privées, jetons JWT), avec un vrai positif sur cinq ;
+ZAP ne retrouve que les en-têtes de sécurité manquants (`JS-SECURITY-HEADERS`),
+ce qui illustre la complémentarité des approches.
 `npm audit` dépend du registre et d'un lockfile : lors des premières campagnes
 il a remonté 97 constats (4 % de précision, 31 % de rappel), mais lors de la
 dernière exécution il a expiré — la campagne a continué et l'erreur est
@@ -209,6 +212,30 @@ Les six constats d'en-têtes sont réels mais **hors vérité terrain** (celle-c
 suit la liste officielle des challenges crAPI) : ils sont donc comptés comme
 faux positifs. C'est le comportement attendu d'une métrique dont la référence
 est explicite — et non un défaut du détecteur.
+
+Le DAST seul ne retrouve aucune de ces vulnérabilités : ZAP baseline produit
+28 constats mais **0 vrai positif** sur crAPI. Les challenges sont des failles
+de logique métier (BOLA, BFLA, mass assignment ou retour de commande) qu'un
+scanner générique ne sait pas enchaîner sans scénario. Sur la campagne complète
+(SAST + SCA + DAST + custom), 449 constats sont produits mais seuls les
+détecteurs maison et la règle Java atteignent la vérité terrain (6 TP, rappel
+43 %, précision 1 %) : le reste est du bruit SCA/DAST hors périmètre de la GT.
+
+### Comparaison DAST sur les trois cibles
+
+| Cible | Constats ZAP (dédupliqués) | TP | Précision | Rappel |
+|---|---:|---:|---:|---:|
+| Juice Shop | 51 | 3 | 6 % | 8 % |
+| crAPI | 28 | 0 | 0 % | 0 % |
+| Roundcube | 52 | 4 | 8 % | 33 % |
+
+ZAP retrouve uniquement les en-têtes de sécurité manquants
+(`*-SECURITY-HEADERS`) ; il ne détecte aucune faille métier ni injection sur
+ces cibles sans authentification ni scénario dédié. C'est précisément le vide
+que comblent les détecteurs maison et les règles Semgrep.
+
+Les trois exécutions DAST sont archivées dans `reports/<cible>/dast/` et
+référencées dans `reports/index.json`.
 
 ---
 

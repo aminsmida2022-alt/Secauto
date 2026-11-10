@@ -134,6 +134,12 @@ Expliquer la vérité terrain :
 > on ne dit pas "ZAP a trouvé 42 alertes", on dit "ZAP a un rappel de X % et une
 > précision de Y % sur cette cible". »
 
+Sur crAPI, la campagne complète donne **43 % de rappel** mais **1 % de
+précision** : les 449 constats sont dominés par le SCA (271 CVE de dépendances)
+et ZAP, alors que la vérité terrain ne contient que les challenges. Le tableau
+par outil montre l'essentiel : les détecteurs maison placent les 3 TP métier
+(BOLA, BFLA, JWT), ZAP 0/26, Trivy 0/271.
+
 ---
 
 ## 6. Avant / après correctif (2 min)

@@ -1,7 +1,8 @@
 # Plan de présentation (soutenance)
 
 Support de 12–14 diapositives, aligné sur `docs/DEMO.md`.
-Les chiffres cités proviennent des exécutions réelles archivées dans `reports/juice-shop/`.
+Les chiffres cités proviennent des exécutions réelles archivées dans
+`reports/juice-shop/`, `reports/crapi/` et `reports/roundcube/`.
 
 ---
 
@@ -106,13 +107,15 @@ outils industriels.
 
 ## Diapo 8 — Résultats mesurés (Juice Shop v20.2.0)
 
-Exécution `baseline` : SAST + Trivy + npm audit.
+Exécutions réelles : `baseline` (SAST + Trivy), `dast` (ZAP) et `sast-full`
+(packs).
 
 | Configuration | Constats | TP | FP | Précision | Rappel |
 |---|---:|---:|---:|---:|---:|
 | Semgrep, règles maison seules (`--offline`) | 3 | 3 | 0 | 100 % | 23 % |
 | Semgrep, packs + règles maison | 36 | 6 | 30 | 17 % | 23 % |
 | Trivy fs (vulnérabilités + secrets) | 5 | 1 | 4 | 20 % | 8 % |
+| ZAP baseline (DAST) | 51 | 3 | 48 | 6 % | 8 % |
 | **Campagne `baseline` (packs + Trivy)** | **41** | **7** | **34** | **17 %** | **23 %** |
 
 `npm audit` n'est pas compté ici : lors de la dernière exécution, le registre
@@ -123,6 +126,8 @@ Lecture honnête :
 
 - Semgrep est **précis** mais ne couvre que ce que ses règles décrivent ;
 - Trivy remonte ici surtout des **secrets** (clés privées, jetons JWT) ;
+- ZAP ne retrouve que les **en-têtes manquants** : le DAST seul rate les
+  injections et les failles métier ;
 - le **rappel global** reste un minorant : la vérité terrain est partielle.
 
 Effet des packs de règles (même cible, mêmes 13 entrées de vérité terrain) :
@@ -148,6 +153,22 @@ que la plateforme permet de mesurer au lieu de le supposer.
 
 Les six constats d'en-têtes sont volontairement comptés FP : la vérité terrain
 suit les challenges OWASP, pas les bonnes pratiques de configuration.
+
+Le **DAST seul** ne retrouve aucune vulnérabilité crAPI (ZAP : 28 constats,
+0 TP) : BOLA/BFLA sont des failles de logique métier. La campagne complète
+(SAST + SCA + DAST + custom) plafonne à 1 % de précision pour 43 % de rappel —
+le bruit vient du SCA (271 CVE) et de ZAP, hors périmètre de la GT.
+
+### DAST sur les trois cibles
+
+| Cible | Constats ZAP | TP | Précision | Rappel |
+|---|---:|---:|---:|---:|
+| Juice Shop | 51 | 3 | 6 % | 8 % |
+| crAPI | 28 | 0 | 0 % | 0 % |
+| Roundcube | 52 | 4 | 8 % | 33 % |
+
+ZAP ne remonte que les en-têtes manquants : aucun challenge métier sans
+scénario authentifié. Les détecteurs maison couvrent cet angle mort.
 
 *(Les chiffres « par outil » dépendent de la version ; les commandes de
 reproduction sont dans `README.md`.)*
