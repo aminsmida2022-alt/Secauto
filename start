@@ -1,0 +1,230 @@
+#!/usr/bin/env bash
+# secauto — lanceur interactif
+set -euo pipefail
+
+# ── couleurs ────────────────────────────────────────────────────────────────
+R='\033[0;31m' G='\033[0;32m' Y='\033[0;33m' B='\033[0;34m'
+C='\033[0;36m' W='\033[1;37m' D='\033[2m' N='\033[0m'
+BOLD='\033[1m'
+
+# ── utilitaires UI ───────────────────────────────────────────────────────────
+hr()  { printf "${D}%s${N}\n" "$(printf '─%.0s' {1..70})"; }
+hdr() { printf "\n${BOLD}${B}%s${N}\n" "$*"; hr; }
+ok()  { printf "  ${G}✔${N}  %s\n" "$*"; }
+err() { printf "  ${R}✘${N}  %s\n" "$*"; }
+inf() { printf "  ${C}→${N}  %s\n" "$*"; }
+wrn() { printf "  ${Y}⚠${N}  %s\n" "$*"; }
+step(){ printf "\n  ${BOLD}${W}[%s]${N} %s\n" "$1" "$2"; }
+spin(){
+  local pid=$1 msg=$2 frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+  local i=0
+  while kill -0 "$pid" 2>/dev/null; do
+    printf "\r  ${C}%s${N}  %s " "${frames[$((i % 10))]}" "$msg"
+    sleep 0.1; ((i++)) || true
+  done
+  printf "\r%-72s\r" " "
+}
+
+DK="$(dirname "$0")/scripts/dk"
+RUN_ID="run-$(date +%Y%m%d-%H%M)"
+LOG_DIR="$(dirname "$0")/reports/logs"
+mkdir -p "$LOG_DIR"
+LOG="$LOG_DIR/$RUN_ID.log"
+
+banner(){
+  clear
+  printf "${BOLD}${B}"
+  cat <<'EOF'
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║            secauto — plateforme de détection de vulnérabilités   ║
+  ║         SAST · DAST · SCA · Custom Detectors · Métriques        ║
+  ╚══════════════════════════════════════════════════════════════════╝
+EOF
+  printf "${N}"
+  printf "  ${D}Run ID : ${W}%s${N}   Log : %s\n\n" "$RUN_ID" "$LOG"
+}
+
+# ── 0. Choix de mode ─────────────────────────────────────────────────────────
+choose_mode(){
+  hdr "Mode d'exécution"
+  printf "  ${W}1)${N} Démo rapide   — détecteurs custom sur crAPI     (≈1 min)\n"
+  printf "  ${W}2)${N} Juice Shop    — SAST + SCA + DAST                (≈6 min)\n"
+  printf "  ${W}3)${N} crAPI         — SAST + SCA + DAST + Custom       (≈8 min)\n"
+  printf "  ${W}4)${N} Toutes cibles — campagne complète                 (≈20 min)\n"
+  printf "  ${W}5)${N} Avant/Après   — démo correctif SQLi Juice Shop   (≈2 min)\n"
+  printf "  ${W}q)${N} Quitter\n"
+  hr
+  read -rp "  Choix [1-5/q] : " MODE
+}
+
+# ── 1. Docker check ──────────────────────────────────────────────────────────
+check_docker(){
+  hdr "Vérification Docker"
+  if "$DK" info &>/dev/null; then
+    ok "Docker accessible"
+  else
+    err "Docker inaccessible"
+    printf "  ${Y}→ Essaie : newgrp docker${N}\n"; exit 1
+  fi
+}
+
+# ── 2. Démarrage des cibles ──────────────────────────────────────────────────
+start_targets(){
+  hdr "Démarrage des cibles"
+
+  local targets=("juice-shop:3000" "crapi:8888" "roundcube:8080")
+  local all_up=true
+
+  for t in "${targets[@]}"; do
+    local name="${t%%:*}" port="${t##*:}"
+    if curl -sf --max-time 3 "http://localhost:$port" &>/dev/null; then
+      ok "$name  → http://localhost:$port  (déjà actif)"
+    else
+      all_up=false
+    fi
+  done
+
+  if ! $all_up; then
+    inf "Démarrage des conteneurs…"
+    (make -C "$(dirname "$0")" up >> "$LOG" 2>&1) &
+    local pid=$!
+    spin $pid "make up en cours"
+    wait $pid || { err "make up a échoué — voir $LOG"; exit 1; }
+
+    printf "  ${D}Attente des health-checks${N}"
+    for i in {1..30}; do
+      sleep 2; printf "."
+      if curl -sf --max-time 2 http://localhost:3000 &>/dev/null &&
+         curl -sf --max-time 2 http://localhost:8888 &>/dev/null; then
+        break
+      fi
+    done
+    printf "\n"
+  fi
+
+  for t in "${targets[@]}"; do
+    local name="${t%%:*}" port="${t##*:}"
+    if curl -sf --max-time 4 "http://localhost:$port" &>/dev/null; then
+      ok "$name  → http://localhost:$port"
+    else
+      wrn "$name  → http://localhost:$port  (ne répond pas encore)"
+    fi
+  done
+}
+
+# ── 3. Lancer un scan ────────────────────────────────────────────────────────
+run_scan(){
+  local target="$1" tools="$2" rid="$3"
+  local label="${target}  [${tools}]"
+
+  step "SCAN" "$label"
+  (cd "$(dirname "$0")" && python3 -m secauto run \
+      --target "$target" --tools "$tools" --run-id "$rid" >> "$LOG" 2>&1) &
+  local pid=$!
+  spin $pid "$label"
+  wait $pid
+  local exit_code=$?
+
+  if [[ $exit_code -eq 0 ]]; then
+    ok "Terminé : $label"
+    local report
+    report="$(dirname "$0")/reports/$target/$rid/report.html"
+    if [[ -f "$report" ]]; then
+      local metrics
+      metrics="$(python3 -c "
+import json,sys
+m=json.load(open('$(dirname "$0")/reports/$target/$rid/metrics.json'))
+o=m.get('overall',{})
+print(f\"  constats: {o.get('tp',0)+o.get('fp',0)}  TP: {o.get('tp',0)}  P: {o.get('precision',0):.0%}  R: {o.get('recall',0):.0%}\")
+" 2>/dev/null || echo "")"
+      inf "Métriques :$metrics"
+      REPORTS+=("$report")
+    fi
+  else
+    err "Erreur sur $label — voir $LOG"
+  fi
+}
+
+# ── 4. Résumé final ──────────────────────────────────────────────────────────
+show_summary(){
+  hdr "Résumé"
+  if [[ ${#REPORTS[@]} -eq 0 ]]; then
+    wrn "Aucun rapport généré."; return
+  fi
+  for r in "${REPORTS[@]}"; do
+    ok "Rapport : $r"
+  done
+  hr
+
+  printf "\n  Ouvrir les rapports dans le navigateur ? ${W}[o/N]${N} "
+  read -r ans
+  if [[ "$ans" =~ ^[oOyY] ]]; then
+    for r in "${REPORTS[@]}"; do
+      xdg-open "$r" 2>/dev/null &
+    done
+    ok "Rapports ouverts"
+  fi
+
+  printf "\n  ${D}Log complet : %s${N}\n" "$LOG"
+}
+
+# ── Mode Avant/Après ─────────────────────────────────────────────────────────
+run_before_after(){
+  hdr "Démo Avant / Après correctif — Juice Shop SQLi"
+
+  step "1/4" "Scan initial (avant correctif)"
+  run_scan "juice-shop" "sast" "before-fix"
+
+  step "2/4" "Application du correctif (requête paramétrée routes/login.ts)"
+  (cd "$(dirname "$0")" && bash scripts/demo-juiceshop-fix.sh >> "$LOG" 2>&1)
+  ok "Correctif appliqué"
+
+  step "3/4" "Nouveau scan (après correctif)"
+  run_scan "juice-shop" "sast" "after-fix"
+
+  step "4/4" "Comparaison diff"
+  printf "\n"
+  (cd "$(dirname "$0")" && python3 -m secauto compare \
+      --target juice-shop --before before-fix --after after-fix) 2>>"$LOG"
+
+  printf "\n  ${D}Restauration du fichier vulnérable…${N}\n"
+  (cd "$(dirname "$0")" && bash scripts/demo-juiceshop-fix.sh --restore >> "$LOG" 2>&1)
+  ok "Fichier restauré"
+}
+
+# ── MAIN ─────────────────────────────────────────────────────────────────────
+REPORTS=()
+
+banner
+choose_mode
+
+[[ "$MODE" == "q" ]] && { printf "\n  Au revoir.\n\n"; exit 0; }
+
+check_docker
+start_targets
+
+case "$MODE" in
+  1)
+    run_scan "crapi" "custom" "$RUN_ID"
+    ;;
+  2)
+    run_scan "juice-shop" "sast,sca,dast" "$RUN_ID"
+    ;;
+  3)
+    run_scan "crapi" "sast,sca,dast,custom" "$RUN_ID"
+    ;;
+  4)
+    run_scan "juice-shop" "sast,sca,dast" "${RUN_ID}-js"
+    run_scan "crapi"      "sast,sca,dast,custom" "${RUN_ID}-cr"
+    run_scan "roundcube"  "dast" "${RUN_ID}-rc"
+    ;;
+  5)
+    run_before_after
+    ;;
+  *)
+    err "Choix invalide"; exit 1
+    ;;
+esac
+
+show_summary
+printf "\n"
