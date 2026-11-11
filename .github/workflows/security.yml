@@ -38,9 +38,11 @@ jobs:
         run: pip install semgrep
 
       - name: Installer Trivy
-        uses: aquasecurity/setup-trivy@v0.3.1
-        with:
-          version: v0.57.1
+        run: |
+          curl -sfL -o /tmp/trivy.tgz \
+            https://github.com/aquasecurity/trivy/releases/download/v0.76.2/trivy_0.76.2_Linux-64bit.tar.gz
+          tar -xzf /tmp/trivy.tgz -C /usr/local/bin trivy
+          trivy --version
 
       - name: Récupérer le code source des cibles
         run: |
@@ -66,7 +68,6 @@ jobs:
             --threshold high >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Publier les résultats SARIF (GitHub code scanning)
-        if: always()
         run: python scripts/to_sarif.py --run-dir "reports/${{ matrix.target }}/ci-${{ github.run_number }}" --out secauto.sarif
 
       - uses: github/codeql-action/upload-sarif@v3
@@ -149,6 +150,7 @@ jobs:
           path: artifacts
       - name: Résumé
         run: |
+          mkdir -p artifacts
           echo "## Résultats secauto" >> "$GITHUB_STEP_SUMMARY"
           find artifacts -name summary.md -print -exec cat {} \;
 
