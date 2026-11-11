@@ -46,6 +46,9 @@ targets:
       seed_urls:
         - http://localhost:3000
       ajax_spider: true
+      # Script ZAP maison (scanners/zap/secauto_hooks.py) : sondes .env,
+      # .git, actuator, stack trace — chargé via --hook de zap-baseline.py.
+      zap_hook: true
     sast:
       # Fixtures pédagogiques (exemples de correctifs) : hors périmètre déployé.
       exclude:

@@ -25,11 +25,20 @@ spin(){
   printf "\r%-72s\r" " "
 }
 
-DK="$(dirname "$0")/scripts/dk"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+DK="$ROOT/scripts/dk"
 RUN_ID="run-$(date +%Y%m%d-%H%M)"
-LOG_DIR="$(dirname "$0")/reports/logs"
+LOG_DIR="$ROOT/reports/logs"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/$RUN_ID.log"
+WEB_PID=""
+
+cleanup(){
+  if [[ -n "$WEB_PID" ]] && kill -0 "$WEB_PID" 2>/dev/null; then
+    kill "$WEB_PID" 2>/dev/null
+  fi
+}
+trap cleanup EXIT
 
 banner(){
   clear
@@ -57,7 +66,33 @@ choose_mode(){
   read -rp "  Choix [1-5/q] : " MODE
 }
 
-# ── 1. Docker check ──────────────────────────────────────────────────────────
+# ── 1. Interface web ─────────────────────────────────────────────────────────
+start_web_ui(){
+  hdr "Interface web"
+  if curl -sf --max-time 2 http://localhost:5000 &>/dev/null; then
+    ok "Interface déjà active → http://localhost:5000"
+    return
+  fi
+  PYTHON="$ROOT/venv/bin/python3"
+  (cd "$ROOT" && "$PYTHON" -m web.app >> "$LOG" 2>&1) &
+  WEB_PID=$!
+  printf "  ${D}Démarrage de l'interface${N}"
+  for i in {1..20}; do
+    sleep 0.5; printf "."
+    if curl -sf --max-time 1 http://localhost:5000 &>/dev/null; then
+      break
+    fi
+  done
+  printf "\n"
+  if kill -0 "$WEB_PID" 2>/dev/null; then
+    ok "Interface web → http://localhost:5000"
+    xdg-open http://localhost:5000 2>/dev/null &
+  else
+    err "L'interface web n'a pas démarré — voir $LOG"
+  fi
+}
+
+# ── 2. Docker check ──────────────────────────────────────────────────────────
 check_docker(){
   hdr "Vérification Docker"
   if "$DK" info &>/dev/null; then
@@ -86,7 +121,7 @@ start_targets(){
 
   if ! $all_up; then
     inf "Démarrage des conteneurs…"
-    (make -C "$(dirname "$0")" up >> "$LOG" 2>&1) &
+    (make -C "$ROOT" up >> "$LOG" 2>&1) &
     local pid=$!
     spin $pid "make up en cours"
     wait $pid || { err "make up a échoué — voir $LOG"; exit 1; }
@@ -118,7 +153,7 @@ run_scan(){
   local label="${target}  [${tools}]"
 
   step "SCAN" "$label"
-  (cd "$(dirname "$0")" && python3 -m secauto run \
+  (cd "$ROOT" && "$ROOT/venv/bin/python3" -m secauto run \
       --target "$target" --tools "$tools" --run-id "$rid" >> "$LOG" 2>&1) &
   local pid=$!
   spin $pid "$label"
@@ -128,12 +163,12 @@ run_scan(){
   if [[ $exit_code -eq 0 ]]; then
     ok "Terminé : $label"
     local report
-    report="$(realpath "$(dirname "$0")/reports/$target/$rid/report.html")"
+    report="$(realpath "$ROOT/reports/$target/$rid/report.html")"
     if [[ -f "$report" ]]; then
       local metrics
       metrics="$(python3 -c "
 import json,sys
-m=json.load(open('$(dirname "$(realpath "$0")")/reports/$target/$rid/metrics.json'))
+m=json.load(open('$ROOT/reports/$target/$rid/metrics.json'))
 o=m.get('overall',{})
 print(f\"  constats: {o.get('tp',0)+o.get('fp',0)}  TP: {o.get('tp',0)}  P: {o.get('precision',0):.0%}  R: {o.get('recall',0):.0%}\")
 " 2>/dev/null || echo "")"
@@ -177,7 +212,7 @@ run_before_after(){
   run_scan "juice-shop" "sast" "before-fix"
 
   step "2/4" "Application du correctif (requête paramétrée routes/login.ts)"
-  (cd "$(dirname "$0")" && bash scripts/demo-juiceshop-fix.sh >> "$LOG" 2>&1)
+  (cd "$ROOT" && bash scripts/demo-juiceshop-fix.sh >> "$LOG" 2>&1)
   ok "Correctif appliqué"
 
   step "3/4" "Nouveau scan (après correctif)"
@@ -185,11 +220,11 @@ run_before_after(){
 
   step "4/4" "Comparaison diff"
   printf "\n"
-  (cd "$(dirname "$0")" && python3 -m secauto compare \
+  (cd "$ROOT" && "$ROOT/venv/bin/python3" -m secauto compare \
       --target juice-shop --before before-fix --after after-fix) 2>>"$LOG"
 
   printf "\n  ${D}Restauration du fichier vulnérable…${N}\n"
-  (cd "$(dirname "$0")" && bash scripts/demo-juiceshop-fix.sh --restore >> "$LOG" 2>&1)
+  (cd "$ROOT" && bash scripts/demo-juiceshop-fix.sh --restore >> "$LOG" 2>&1)
   ok "Fichier restauré"
 }
 
@@ -197,11 +232,12 @@ run_before_after(){
 REPORTS=()
 
 banner
+check_docker
+start_web_ui
 choose_mode
 
 [[ "$MODE" == "q" ]] && { printf "\n  Au revoir.\n\n"; exit 0; }
 
-check_docker
 start_targets
 
 case "$MODE" in

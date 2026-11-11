@@ -1,0 +1,32 @@
+<div class="table-wrap">
+<table class="data-table">
+  <thead><tr>
+    <th>{{ t('severity') }}</th>
+    <th>{{ t('title_col') }}</th>
+    <th>{{ t('tool') }}</th>
+    <th>{{ t('target') }}</th>
+    <th>{{ t('endpoint') }}</th>
+    <th>{{ t('cwe') }}</th>
+  </tr></thead>
+  <tbody>
+  {% for f in diff_rows %}
+  <tr>
+    <td><span class="sev sev--{{ f.severity }}">{{ f.severity }}</span></td>
+    <td class="f-title">
+      {{ f.title }}
+      {% if f.evidence %}
+      <details class="evidence">
+        <summary>preuve</summary>
+        <code>{{ f.evidence[:300] }}</code>
+      </details>
+      {% endif %}
+    </td>
+    <td><span class="tool-badge">{{ f.tool }}</span></td>
+    <td>{{ f.target }}</td>
+    <td class="f-loc">{{ f.endpoint or f.file or '—' }}</td>
+    <td>{{ f.cwe|join(', ') if f.cwe else '—' }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>

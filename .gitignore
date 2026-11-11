@@ -16,5 +16,8 @@ targets/sources/
 .env
 *.local
 
+# Base locale de l'interface web
+web/secauto.db
+
 # OS
 .DS_Store

@@ -55,10 +55,11 @@ CI/CD  : GitHub Actions (push/PR → SAST+SCA, nightly → DAST, artefacts + SAR
 | DAST | ZAP baseline / full / api-scan |
 | SCA | Trivy (vulnérabilités, secrets) + `npm audit` |
 | Conservation des résultats de chaque outil | `reports/<cible>/<run>/raw/` |
-| Mécanisme complémentaire | 5 règles Semgrep maison + 3 détecteurs Python (headers, BOLA/BFLA, JWT) |
+| Mécanisme complémentaire | 5 règles Semgrep maison + 3 détecteurs Python (headers, BOLA/BFLA, JWT) + script ZAP maison (`scanners/zap/secauto_hooks.py`, sondes `.env` / `.git` / actuator / stack trace) |
 | Automatisation | `Makefile`, CLI `secauto`, workflow GitHub Actions |
 | Archivage | artefacts CI 30 jours + `reports/index.json` |
 | Exploitation | HTML, Markdown, JSON normalisé, SARIF, diff avant/après |
+| Alertes | `secauto alert` (seuil de sévérité, `alerts.md` archivé) + job summary CI + issue GitHub automatique |
 | Métriques | `metrics/ground_truth/*.yaml` → TP/FP/FN, précision, rappel, F1 |
 
 ---
@@ -130,6 +131,7 @@ le plan de présentation dans [`docs/PRESENTATION.md`](docs/PRESENTATION.md).
 | `make ci TARGET=juice-shop` | échoue si un résultat ≥ high |
 | `make compare TARGET=juice-shop BEFORE=… AFTER=…` | diff avant/après |
 | `python3 -m secauto compare --target … --before … --after …` | idem sans Make |
+| `python3 -m secauto alert --target juice-shop --run-id <id> [--threshold high]` | alerte si des constats dépassent le seuil (archive `alerts.md`, code 1 si alerte) |
 | `make down-all` | arrête toutes les cibles |
 
 Codes de sortie : `0` succès, `1` seuil `--fail-on` atteint, `2` erreur de configuration.
@@ -262,6 +264,25 @@ référencées dans `reports/index.json`.
 Ces scripts respectent le contrat `{"findings": [...]}` et sont donc
 interchangeables avec les outils industriels dans le pipeline.
 
+### Script ZAP maison (`scanners/zap/secauto_hooks.py`)
+
+Hook Python chargé par `zap-baseline.py` via son drapeau officiel
+`--hook` (activé pour Juice Shop avec `dast.zap_hook: true` dans
+`config/targets.yaml`). Le hook réalise des **sondes HTTP ciblées** que les
+règles passives stock ZAP ne couvrent pas, injecte les alertes dans ZAP
+(`alert.add`) et écrit `raw/zap-custom.json`, relu et fusionné par le runner :
+
+| Sonde | Alerte | Sévérité | CWE |
+|---|---|---|---|
+| `/.env` avec contenu de variables | `SECAUTO - Exposed .env File` | Medium | 200 |
+| `/.git/HEAD` répondant `ref: refs/` | `SECAUTO - Exposed Git Repository` | High | 538 |
+| `/actuator` exposé (Spring Boot) | `SECAUTO - Exposed Spring Boot Actuator` | Medium | 16 |
+| stack trace sur une page d'erreur | `SECAUTO - Stack Trace Disclosure` | Low | 209 |
+
+Ces constats portent les identifiants de règle `990001`–`990004`
+(réservés à secauto) et apparaissent dans les rapports ZAP et dans
+les métriques DAST comme n'importe quel constat ZAP.
+
 ---
 
 ## 7. CI/CD
@@ -273,6 +294,10 @@ interchangeables avec les outils industriels dans le pipeline.
 2. **lundi 03:00 UTC** ou manuel → job `dast` : démarre Juice Shop, lance ZAP,
    archive le rapport HTML.
 3. **agrégation** : un artefact unique `reports-all` + résumé dans le job summary.
+4. **alertes** : chaque job d'analyse ajoute le rendu `secauto alert`
+   (seuil `high`) au job summary ; le job d'agrégation ouvre une **issue
+   GitHub** `secauto` si un constat critique/élevé est détecté (pas de
+   doublon tant qu'une issue est ouverte).
 
 Chaque exécution est identifiée par `ci-<numéro>` et archivée 30 jours.
 
@@ -282,9 +307,10 @@ Chaque exécution est identifiée par `ci-<numéro>` et archivée 30 jours.
 
 ```
 config/                 targets.yaml, idor-crapi.yaml
-secauto/                package Python (CLI, runners, metrics, report)
+secauto/                package Python (CLI, runners, metrics, alerts, report)
 scanners/semgrep/rules/ règles personnalisées
 scanners/custom/        détecteurs Python autonomes
+scanners/zap/           script ZAP maison (hooks zap-baseline.py)
 targets/compose/        Juice Shop, Roundcube
 scripts/                install-docker, deploy-crapi, fetch-sources, to_sarif
 metrics/ground_truth/   vérité terrain par cible

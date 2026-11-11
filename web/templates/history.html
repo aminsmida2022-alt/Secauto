@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block title %} — {{ t('scan_history') }}{% endblock %}
+
+{% block content %}
+<div class="history-wrap">
+  <div class="page-header">
+    <a href="{{ url_for('index') }}" class="back-link">← {{ t('back') }}</a>
+    <h1>{{ t('scan_history') }}</h1>
+  </div>
+
+  {% if scans %}
+  <div class="table-wrap">
+  <table class="data-table" id="historyTable">
+    <thead><tr>
+      <th>Run ID</th>
+      <th>{{ t('target') }}</th>
+      <th>Outils</th>
+      <th>{{ t('findings') }}</th>
+      <th>{{ t('tp') }}</th>
+      <th>{{ t('date') }}</th>
+      <th>{{ t('status') }}</th>
+      <th></th>
+    </tr></thead>
+    <tbody>
+    {% for s in scans %}
+    {% set tgts  = s.targets | from_json %}
+    {% set tools = s.tools   | from_json %}
+    <tr>
+      <td class="mono">{{ s.run_id }}</td>
+      <td>{% for tgt in tgts %}<span class="tag">{{ TARGETS[tgt].name if tgt in TARGETS else tgt }}</span> {% endfor %}</td>
+      <td>{% for tool in tools %}<span class="tool-badge" style="margin-right:.25rem">{{ tool }}</span>{% endfor %}</td>
+      <td>{{ s.total_findings }}</td>
+      <td>{{ s.total_tp }}</td>
+      <td>{{ s.started_at[:16].replace('T',' ') }}</td>
+      <td><span class="status-badge status--{{ s.status }}">{{ s.status }}</span></td>
+      <td>
+        {% if s.status == 'done' %}
+        <div class="row-actions">
+          <a href="{{ url_for('results', run_id=s.run_id) }}" class="btn-sm">{{ t('view') }} →</a>
+          <button type="button" class="btn-cmp-row"
+                  onclick="pickCompare(this, '{{ s.run_id }}', '{{ s.started_at }}')">⇄ {{ t('compare') }}</button>
+        </div>
+        {% elif s.status == 'running' %}
+        <a href="{{ url_for('scan_page', run_id=s.run_id) }}" class="btn-sm">Live →</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty-msg">{{ t('no_history') }}</p>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let cmpPick = null;
+
+function cmpReset() {
+  cmpPick = null;
+  document.querySelectorAll('#historyTable tr.row-picked, #historyTable tr.row-selectable')
+          .forEach(r => r.classList.remove('row-picked', 'row-selectable'));
+}
+
+function pickCompare(btn, runId, startedAt) {
+  const row = btn.closest('tr');
+  if (!cmpPick) {
+    cmpPick = { runId: runId, startedAt: startedAt };
+    row.classList.add('row-picked');
+    document.querySelectorAll('#historyTable tbody tr').forEach(r => {
+      if (r !== row && r.querySelector('.btn-cmp-row')) r.classList.add('row-selectable');
+    });
+  } else if (cmpPick.runId === runId) {
+    cmpReset();
+  } else {
+    // la plus ancienne = avant, la plus récente = après
+    let before = cmpPick, after = { runId: runId, startedAt: startedAt };
+    if (before.startedAt > after.startedAt) { const tmp = before; before = after; after = tmp; }
+    window.location.href = `/compare?before=${encodeURIComponent(before.runId)}&after=${encodeURIComponent(after.runId)}`;
+  }
+}
+</script>
+{% endblock %}

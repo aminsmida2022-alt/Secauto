@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block title %} — {{ t('scanning') }}{% endblock %}
+
+{% block content %}
+<div class="scan-wrap">
+
+  <div class="scan-header">
+    <div class="pulse-ring" id="pulseRing"></div>
+    <div>
+      <h1 class="scan-title" id="scanTitle">{{ t('scanning') }}</h1>
+      <p class="scan-id">{{ run_id }}</p>
+    </div>
+  </div>
+
+  {% set targets_list = scan.targets | from_json %}
+  {% set tools_list   = scan.tools   | from_json %}
+
+  <div id="targetList">
+    {% for tgt in targets_list %}
+    <div class="target-block" id="tgt-{{ tgt }}">
+      <div class="target-head">
+        <span class="tgt-emoji">{{ TARGETS[tgt].icon if tgt in TARGETS else '🎯' }}</span>
+        <span class="tgt-name">{{ TARGETS[tgt].name if tgt in TARGETS else tgt }}</span>
+        <span class="tgt-dot" id="dot-{{ tgt }}"></span>
+      </div>
+      <div class="tool-steps" id="steps-{{ tgt }}">
+        {% for tool in tools_list %}
+        <div class="tool-step">
+          <span class="step-emoji">{{ TOOLS[tool].icon if tool in TOOLS else '🔧' }}</span>
+          <span class="step-name">{{ TOOLS[tool].name if tool in TOOLS else tool }}</span>
+          <span class="step-pill idle" id="pill-{{ tgt }}-{{ tool }}">—</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <details class="log-box">
+    <summary>{{ t('live_log') }}</summary>
+    <pre class="log-pre" id="logPre"></pre>
+  </details>
+
+</div>
+
+<script>
+const runId   = "{{ run_id }}";
+const tools   = {{ tools_list | tojson }};
+const targets = {{ targets_list | tojson }};
+
+const es = new EventSource(`/scan/${runId}/stream`);
+
+es.onmessage = e => {
+  const msg = JSON.parse(e.data);
+  if (msg.type === 'ping') return;
+
+  if (msg.type === 'target_start') {
+    const dot = document.getElementById(`dot-${msg.target}`);
+    if (dot) dot.className = 'tgt-dot running';
+    tools.forEach(tool => {
+      const el = document.getElementById(`pill-${msg.target}-${tool}`);
+      if (el) { el.className = 'step-pill pending'; el.textContent = '…'; }
+    });
+  }
+
+  if (msg.type === 'log') {
+    const pre = document.getElementById('logPre');
+    pre.textContent += msg.text + '\n';
+    pre.scrollTop = pre.scrollHeight;
+    tools.forEach(tool => {
+      if (msg.text.toLowerCase().includes(tool)) {
+        const el = document.getElementById(`pill-${msg.target}-${tool}`);
+        if (el && el.className === 'step-pill pending') {
+          el.className = 'step-pill running'; el.textContent = '⚙';
+        }
+      }
+    });
+  }
+
+  if (msg.type === 'target_done') {
+    const dot = document.getElementById(`dot-${msg.target}`);
+    if (dot) dot.className = 'tgt-dot done';
+    tools.forEach(tool => {
+      const el = document.getElementById(`pill-${msg.target}-${tool}`);
+      if (el) { el.className = 'step-pill done'; el.textContent = '✓'; }
+    });
+  }
+
+  if (msg.type === 'done') {
+    es.close();
+    document.getElementById('scanTitle').textContent = "{{ t('redirecting') }}";
+    document.getElementById('pulseRing').classList.add('done');
+    setTimeout(() => window.location.href = `/results/${runId}`, 1200);
+  }
+};
+</script>
+{% endblock %}

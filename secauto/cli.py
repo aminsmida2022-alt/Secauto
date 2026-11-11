@@ -49,6 +49,17 @@ def cmd_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_alert(args: argparse.Namespace) -> int:
+    from .config import REPORT_DIR
+    from .alerts import emit, render_markdown
+
+    run_dir = REPORT_DIR / args.target / args.run_id
+    alerts = emit(run_dir, threshold=args.threshold)
+    print(render_markdown(alerts))
+    print(f"Alerte archivée : {alerts['path']}")
+    return 1 if alerts["blocking"] else 0
+
+
 def cmd_show(args: argparse.Namespace) -> int:
     print(json.dumps(load_targets().get(args.target, {}), indent=2, ensure_ascii=False))
     return 0
@@ -89,6 +100,20 @@ def build_parser() -> argparse.ArgumentParser:
     compare_parser.add_argument("--before", required=True, help="run-id de référence")
     compare_parser.add_argument("--after", required=True, help="run-id à comparer")
     compare_parser.set_defaults(func=cmd_compare)
+
+    alert_parser = sub.add_parser(
+        "alert",
+        help="générer une alerte si des constats dépassent le seuil de sévérité",
+    )
+    alert_parser.add_argument("--target", required=True)
+    alert_parser.add_argument("--run-id", required=True)
+    alert_parser.add_argument(
+        "--threshold",
+        choices=["critical", "high", "medium", "low", "info"],
+        default="high",
+        help="niveau qui déclenche l'alerte (défaut : high)",
+    )
+    alert_parser.set_defaults(func=cmd_alert)
 
     show_parser = sub.add_parser("show", help="afficher la configuration d'une cible")
     show_parser.add_argument("--target", required=True)

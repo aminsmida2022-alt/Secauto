@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}{% endblock %}
+
+{% block content %}
+<div class="hero">
+  <div class="hero-text">
+    <h1 class="hero-title">
+      {% if lang == 'fr' %}
+        Scanne tes apps.<br><span>Trouve les failles.</span>
+      {% else %}
+        Scan your apps.<br><span>Find vulnerabilities.</span>
+      {% endif %}
+    </h1>
+    <p class="hero-sub">{{ t('choose_targets') }} &rarr; {{ t('choose_tools') }} &rarr; {{ t('launch') }}</p>
+  </div>
+  <button class="btn-demo" id="demoBtn" type="button">
+    ⚡ {% if lang == 'fr' %}Démo rapide{% else %}Quick Demo{% endif %}
+  </button>
+</div>
+
+<form method="post" action="{{ url_for('scan_start') }}" id="scanForm">
+
+  <section class="section">
+    <h2 class="section-label">
+      <span class="section-num">1</span>
+      {{ t('choose_targets') }}
+    </h2>
+    <div class="card-grid">
+      {% for key, tgt in TARGETS.items() %}
+      <label class="sel-card" data-key="{{ key }}">
+        <input type="checkbox" name="targets" value="{{ key }}" hidden>
+        <div class="card-top">
+          <span class="card-emoji">{{ tgt.icon }}</span>
+          <div>
+            <div class="card-name">{{ tgt.name }}</div>
+            <div class="card-url">{{ tgt.url }}</div>
+          </div>
+        </div>
+        <p class="card-desc">{{ tgt[lang] }}</p>
+        <div class="tag-row">
+          {% for tag in tgt.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
+        </div>
+        <div class="sel-check">✓</div>
+      </label>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="section-label">
+      <span class="section-num">2</span>
+      {{ t('choose_tools') }}
+    </h2>
+    <div class="card-grid card-grid--4">
+      {% for key, tool in TOOLS.items() %}
+      <label class="sel-card" data-key="{{ key }}">
+        <input type="checkbox" name="tools" value="{{ key }}" hidden>
+        <div class="card-top">
+          <span class="card-emoji">{{ tool.icon }}</span>
+          <div>
+            <div class="card-name">{{ tool.name }}</div>
+            <div class="tool-sub">{{ tool.sub }}</div>
+          </div>
+        </div>
+        <p class="card-desc">{{ tool[lang] }}</p>
+        <div class="tool-dur">⏱ {{ tool.dur }}</div>
+        <div class="sel-check">✓</div>
+      </label>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="launch-row">
+    <span class="sel-summary" id="selSummary">
+      {% if lang == 'fr' %}Sélectionne au moins une cible et un outil pour lancer.{% else %}Select at least one target and one tool to launch.{% endif %}
+    </span>
+    <button type="submit" class="btn-launch" id="launchBtn" disabled>
+      {{ t('launch') }} &rarr;
+    </button>
+  </div>
+
+</form>
+
+<form method="post" action="{{ url_for('scan_start') }}" id="demoForm" style="display:none">
+  <input type="hidden" name="targets" value="juice-shop">
+  <input type="hidden" name="targets" value="crapi">
+  <input type="hidden" name="tools"   value="sast">
+  <input type="hidden" name="tools"   value="custom">
+</form>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}

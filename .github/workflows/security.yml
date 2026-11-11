@@ -12,6 +12,7 @@ permissions:
   contents: read
   security-events: write
   actions: read
+  issues: write
 
 jobs:
   # -------------------------------------------------------------------------
@@ -55,6 +56,14 @@ jobs:
             --target "${{ matrix.target }}" \
             --tools sast,sca,sca-npm \
             --run-id "ci-${{ github.run_number }}"
+
+      - name: Alertes (seuil high)
+        if: always()
+        run: |
+          python -m secauto alert \
+            --target "${{ matrix.target }}" \
+            --run-id "ci-${{ github.run_number }}" \
+            --threshold high >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Publier les résultats SARIF (GitHub code scanning)
         if: always()
@@ -109,6 +118,14 @@ jobs:
             --tools dast,custom \
             --run-id "ci-${{ github.run_number }}"
 
+      - name: Alertes (seuil high)
+        if: always()
+        run: |
+          python -m secauto alert \
+            --target juice-shop \
+            --run-id "ci-${{ github.run_number }}" \
+            --threshold high >> "$GITHUB_STEP_SUMMARY" || true
+
       - name: Archiver les rapports
         if: always()
         uses: actions/upload-artifact@v4
@@ -134,6 +151,31 @@ jobs:
         run: |
           echo "## Résultats secauto" >> "$GITHUB_STEP_SUMMARY"
           find artifacts -name summary.md -print -exec cat {} \;
+
+      - name: Alerte consolidée (issue GitHub)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create secauto --color D32F2F --description "Alertes secauto" || true
+          BLOCKING=0
+          for md in $(find artifacts -name alerts.md); do
+            if grep -q '🔴' "$md"; then
+              BLOCKING=1
+              cat "$md" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+          if [ "$BLOCKING" = "1" ]; then
+            if gh issue list --state open --search "secauto in:title" --limit 5 | grep -qi secauto; then
+              echo "Une issue secauto est déjà ouverte — pas de doublon."
+            else
+              gh issue create \
+                --title "🔴 secauto : constats au-dessus du seuil (run ci-${{ github.run_number }})" \
+                --body "Des constats critiques/élevés ont été détectés. Consulter le job summary et les artefacts \`reports-all\`." \
+                --label secauto
+            fi
+          else
+            echo "Aucune alerte déclenchée."
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: reports-all

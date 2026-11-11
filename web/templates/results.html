@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% block title %} — {{ t('results_title') }}{% endblock %}
+
+{% block content %}
+<div class="results-wrap">
+
+  <div class="page-header">
+    <a href="{{ url_for('index') }}" class="back-link">← {{ t('back') }}</a>
+    <div>
+      <h1>{{ t('results_title') }}</h1>
+      <p class="run-meta">
+        {{ run_id }}
+        {% if scan %} &middot; {{ scan.started_at[:16].replace('T',' ') }}{% endif %}
+        &middot; {% for tgt in targets_list %}
+          <span class="tag">{{ TARGETS[tgt].name if tgt in TARGETS else tgt }}</span>
+        {% endfor %}
+      </p>
+    </div>
+    <a href="{{ url_for('compare', after=run_id) }}" class="btn-cmp">⇄ {{ t('compare') }}</a>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-row">
+    <div class="kpi"><span class="kpi-n">{{ findings|length }}</span><span class="kpi-l">{{ t('findings') }}</span></div>
+    {% for s in ['critical','high','medium','low','info'] %}{% if sev.get(s,0) > 0 %}
+    <div class="kpi kpi--{{ s }}"><span class="kpi-n">{{ sev.get(s,0) }}</span><span class="kpi-l">{{ s }}</span></div>
+    {% endif %}{% endfor %}
+    {% if scan %}
+    <div class="kpi kpi--tp"><span class="kpi-n">{{ scan.total_tp }}</span><span class="kpi-l">{{ t('tp') }}</span></div>
+    {% endif %}
+  </div>
+
+  <!-- METRICS PER TARGET -->
+  {% for tgt, m in metrics.items() %}
+  {% set ov = m.get('overall', {}) %}
+  {% if ov %}
+  <div class="metrics-block">
+    <h3>{{ TARGETS[tgt].name if tgt in TARGETS else tgt }} &mdash; {{ t('overall') }}</h3>
+    <div class="metric-pills">
+      <span class="mpill">{{ t('precision') }} <strong>{{ (ov.precision * 100)|int }}%</strong></span>
+      <span class="mpill">{{ t('recall') }} <strong>{{ (ov.recall * 100)|int }}%</strong></span>
+      <span class="mpill">{{ t('tp') }} <strong>{{ ov.tp }}</strong></span>
+      <span class="mpill">{{ t('fp') }} <strong>{{ ov.fp }}</strong></span>
+      <span class="mpill">{{ t('fn') }} <strong>{{ ov.fn }}</strong></span>
+    </div>
+    {% if m.get('per_tool') %}
+    <div class="cmp-card">
+      <div class="cmp-head">
+        <span class="cmp-title">{{ t('approach_comparison') }}</span>
+        <span class="cmp-best-legend">🏆 = {{ t('best') }}</span>
+      </div>
+      <p class="cmp-sub">{{ t('approach_comparison_sub') }}</p>
+      {% set best_p = m.per_tool.values() | map(attribute='precision') | max %}
+      {% set best_r = m.per_tool.values() | map(attribute='recall') | max %}
+      {% for tool, tm in m.per_tool.items() | sort(attribute='1.precision', reverse=true) %}
+      <div class="cmp-row {{ 'cmp-row--top' if tm.precision == best_p }}">
+        <div class="cmp-tool">
+          <span class="tool-badge">{{ tool }}</span>
+          {% if tm.precision == best_p %}<span class="cmp-medal">🏆 {{ t('best') }}</span>{% endif %}
+        </div>
+        <div class="cmp-meters">
+          <div class="cmp-meter">
+            <span class="cmp-key">{{ t('precision') }}</span>
+            <div class="cmp-track"><div class="cmp-fill cmp-fill--p" style="width: {{ (tm.precision * 100) | int }}%"></div></div>
+            <span class="cmp-val">{{ (tm.precision * 100) | int }}%</span>
+          </div>
+          <div class="cmp-meter">
+            <span class="cmp-key">{{ t('recall') }}</span>
+            <div class="cmp-track"><div class="cmp-fill cmp-fill--r" style="width: {{ (tm.recall * 100) | int if tm.recall is not none else 0 }}%"></div></div>
+            <span class="cmp-val">{{ (tm.recall * 100) | int if tm.recall is not none else '—' }}%</span>
+          </div>
+        </div>
+        <div class="cmp-stats">
+          <span class="cmp-stat">{{ t('findings') }} <strong>{{ tm.findings }}</strong></span>
+          <span class="cmp-stat cmp-stat--ok">TP <strong>{{ tm.tp }}</strong></span>
+          <span class="cmp-stat cmp-stat--ko">FP <strong>{{ tm.fp }}</strong></span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endfor %}
+
+  <!-- FINDINGS TABLE -->
+  <div class="findings-section">
+    <div class="findings-toolbar">
+      <h3>{{ t('findings') }}</h3>
+      <div class="filter-row">
+        <select id="filterSev" onchange="filterFindings()">
+          <option value="">{{ t('severity') }}: {{ t('all') }}</option>
+          <option>critical</option><option>high</option>
+          <option>medium</option><option>low</option><option>info</option>
+        </select>
+        <select id="filterTool" onchange="filterFindings()">
+          <option value="">{{ t('tool') }}: {{ t('all') }}</option>
+          {% set tools_seen = [] %}
+          {% for f in findings %}{% if f.tool not in tools_seen %}
+          <option>{{ f.tool }}</option>{% set _ = tools_seen.append(f.tool) %}
+          {% endif %}{% endfor %}
+        </select>
+        <input type="text" id="filterSearch" placeholder="🔍 …" oninput="filterFindings()">
+      </div>
+    </div>
+
+    {% if findings %}
+    <div class="table-wrap">
+    <table class="data-table" id="findingsTable">
+      <thead><tr>
+        <th>{{ t('severity') }}</th>
+        <th>{{ t('title_col') }}</th>
+        <th>{{ t('tool') }}</th>
+        <th>{{ t('target') }}</th>
+        <th>{{ t('endpoint') }}</th>
+        <th>{{ t('cwe') }}</th>
+      </tr></thead>
+      <tbody>
+      {% for f in findings %}
+      <tr class="finding-row"
+          data-sev="{{ f.severity }}"
+          data-tool="{{ f.tool }}"
+          data-text="{{ f.title|lower }} {{ (f.endpoint or f.file or '')|lower }}">
+        <td><span class="sev sev--{{ f.severity }}">{{ f.severity }}</span></td>
+        <td class="f-title">
+          {{ f.title }}
+          {% if f.evidence %}
+          <details class="evidence">
+            <summary>preuve</summary>
+            <code>{{ f.evidence[:300] }}</code>
+          </details>
+          {% endif %}
+        </td>
+        <td><span class="tool-badge">{{ f.tool }}</span></td>
+        <td>{{ f._target }}</td>
+        <td class="f-loc">{{ f.endpoint or f.file or '—' }}</td>
+        <td>{{ f.cwe|join(', ') if f.cwe else '—' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p class="empty-msg">{{ t('no_findings') }}</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+function filterFindings() {
+  const sev    = document.getElementById('filterSev').value.toLowerCase();
+  const tool   = document.getElementById('filterTool').value.toLowerCase();
+  const search = document.getElementById('filterSearch').value.toLowerCase();
+  document.querySelectorAll('.finding-row').forEach(row => {
+    const ok = (!sev    || row.dataset.sev  === sev)
+            && (!tool   || row.dataset.tool === tool)
+            && (!search || row.dataset.text.includes(search));
+    row.style.display = ok ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

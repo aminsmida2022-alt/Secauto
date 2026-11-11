@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>secauto{% block title %}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<header class="topbar">
+  <a href="{{ url_for('index') }}" class="logo">
+    secauto<span class="logo-dot">●</span>
+  </a>
+  <div class="topbar-right">
+    <a href="{{ url_for('history') }}" class="nav-link">{{ t('history') }}</a>
+    <div class="lang-toggle">
+      <a href="{{ url_for('set_lang', l='fr') }}" class="lang-btn {{ 'active' if lang=='fr' }}">FR</a>
+      <a href="{{ url_for('set_lang', l='en') }}" class="lang-btn {{ 'active' if lang=='en' }}">EN</a>
+    </div>
+  </div>
+</header>
+
+<main>{% block content %}{% endblock %}</main>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

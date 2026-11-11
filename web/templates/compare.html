@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% block title %} — {{ t('compare_title') }}{% endblock %}
+
+{% block content %}
+<div class="results-wrap">
+
+  <div class="page-header">
+    <a href="{{ url_for('index') }}" class="back-link">← {{ t('back') }}</a>
+    <div>
+      <h1>{{ t('compare_title') }}</h1>
+      <p class="run-meta">{{ t('compare_sub') }}</p>
+    </div>
+  </div>
+
+  <!-- SELECTION FORM -->
+  <form method="get" action="{{ url_for('compare') }}" class="cmp-form">
+    <div class="cmp-selects">
+      <label>
+        <span>{{ t('before') }}</span>
+        <select name="before">
+          <option value="">—</option>
+          {% for r in runs %}
+          <option value="{{ r.run_id }}" {{ 'selected' if r.run_id == before }}>{{ r.run_id[:16].replace('T',' ') }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <span class="cmp-vs">{{ t('vs') }}</span>
+      <label>
+        <span>{{ t('after') }}</span>
+        <select name="after">
+          <option value="">—</option>
+          {% for r in runs %}
+          <option value="{{ r.run_id }}" {{ 'selected' if r.run_id == after }}>{{ r.run_id[:16].replace('T',' ') }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit" class="btn-launch btn-launch--cmp">⇄ {{ t('apply') }}</button>
+    </div>
+  </form>
+
+  {% if result and result.get('error') %}
+    <p class="empty-msg">{{ t('same_run') if result.error == 'same' else t('missing_runs') }}</p>
+  {% endif %}
+
+  {% if result and not result.get('error') %}
+
+  <!-- DIFF KPIs -->
+  <div class="kpi-row">
+    <div class="kpi kpi--new"><span class="kpi-n">{{ result.new | length }}</span><span class="kpi-l">🆕 {{ t('new_f') }}</span></div>
+    <div class="kpi kpi--tp"><span class="kpi-n">{{ result.fixed | length }}</span><span class="kpi-l">✅ {{ t('fixed_f') }}</span></div>
+    <div class="kpi kpi--persistent"><span class="kpi-n">{{ result.persistent | length }}</span><span class="kpi-l">♻ {{ t('persistent_f') }}</span></div>
+  </div>
+
+  <!-- METRICS DELTA PER TARGET -->
+  {% if result.deltas %}
+  <div class="metrics-block">
+    <h3>{{ t('delta_title') }}</h3>
+    <table class="mini-table">
+      <thead><tr>
+        <th>{{ t('target') }}</th>
+        <th>{{ t('findings') }} ({{ t('before') }} → {{ t('after') }})</th>
+        <th>{{ t('precision') }} ({{ t('before') }} → {{ t('after') }})</th>
+        <th>{{ t('recall') }} ({{ t('before') }} → {{ t('after') }})</th>
+      </tr></thead>
+      <tbody>
+      {% for d in result.deltas %}
+      <tr>
+        <td><span class="tag">{{ TARGETS[d.target].name if d.target in TARGETS else d.target }}</span></td>
+        <td>{{ d.before.get('tp',0) + d.before.get('fp',0) }} → <strong>{{ d.after.get('tp',0) + d.after.get('fp',0) }}</strong></td>
+        <td>{{ (d.before.get('precision',0) * 100) | int }}% →
+            <strong>{{ (d.after.get('precision',0) * 100) | int }}%</strong></td>
+        <td>{{ (d.before.get('recall',0) * 100) | int }}% →
+            <strong>{{ (d.after.get('recall',0) * 100) | int }}%</strong></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- NEW FINDINGS -->
+  {% if result.new %}
+  <div class="findings-section">
+    <h3><span class="diff-pill diff-pill--new">🆕 {{ t('new_f') }} ({{ result.new | length }})</span></h3>
+    {% set diff_rows = result.new %}{% include '_diff_table.html' %}
+  </div>
+  {% endif %}
+
+  <!-- FIXED FINDINGS -->
+  {% if result.fixed %}
+  <div class="findings-section">
+    <h3><span class="diff-pill diff-pill--fixed">✅ {{ t('fixed_f') }} ({{ result.fixed | length }})</span></h3>
+    {% set diff_rows = result.fixed %}{% include '_diff_table.html' %}
+  </div>
+  {% endif %}
+
+  <!-- PERSISTENT FINDINGS -->
+  {% if result.persistent %}
+  <div class="findings-section">
+    <details class="diff-details">
+      <summary>♻ {{ t('persistent_f') }} ({{ result.persistent | length }})</summary>
+      {% set diff_rows = result.persistent %}{% include '_diff_table.html' %}
+    </details>
+  </div>
+  {% endif %}
+
+  {% endif %}
+
+</div>
+{% endblock %}

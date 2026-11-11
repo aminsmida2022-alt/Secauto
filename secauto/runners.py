@@ -406,6 +406,15 @@ class ZapRunner(Runner):
             "-w", "zap.md",
             "-I",  # ne pas échouer sur les warnings, on analyse le rapport
         ]
+        if dast.get("zap_hook"):
+            # Script ZAP maison (scanners/zap/secauto_hooks.py) chargé par
+            # zap-baseline.py : sondes HTTP ciblées (.env, .git, actuator,
+            # stack trace) -> alertes ZAP + raw/zap-custom.json.
+            hook_dir = ROOT / "scanners" / "zap"
+            cmd += [
+                "-v", f"{hook_dir}:/zap/wrk/hooks:ro",
+                "--hook=/zap/wrk/hooks/secauto_hooks.py",
+            ]
         if mode == "api":
             spec = dast.get("openapi") or ""
             if not spec:
@@ -453,6 +462,28 @@ class ZapRunner(Runner):
                             raw_ref=f"raw/zap.json#plugin/{alert.get('pluginid', '')}",
                         )
                     )
+
+        # Constats du script ZAP maison (hook), au même contrat {"findings": [...]}
+        custom_file = raw_dir / "zap-custom.json"
+        if custom_file.exists():
+            for item in json.loads(custom_file.read_text(encoding="utf-8")).get("findings", []):
+                findings.append(
+                    Finding(
+                        tool=self.name,
+                        category="DAST",
+                        target=target_name,
+                        title=item.get("title", "Constat ZAP maison"),
+                        severity=item.get("severity", "info"),
+                        description=item.get("description", ""),
+                        cwe=normalize_cwe(item.get("cwe", [])),
+                        rule_id=item.get("rule_id", ""),
+                        endpoint=item.get("endpoint", ""),
+                        evidence=item.get("evidence", ""),
+                        raw_ref=f"raw/zap-custom.json#{item.get('pluginid', '')}",
+                    )
+                )
+            print(f"   [+] zap-hook : constats maison fusionnés "
+                  f"(total zap : {len(findings)})")
         print(f"   [+] zap : {len(findings)} résultat(s)")
         return findings
 
